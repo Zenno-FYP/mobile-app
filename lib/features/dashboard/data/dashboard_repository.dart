@@ -5,8 +5,9 @@ class DashboardRepository {
   DashboardRepository(this._client);
   final ApiClient _client;
 
-  Future<PerformanceMetricsResponse> getPerformanceMetrics() async {
-    final data = await _client.get('/dashboard/performance-metrics');
+  Future<PerformanceMetricsResponse> getPerformanceMetrics({String period = 'current_week'}) async {
+    final params = period != 'current_week' ? {'period': period} : null;
+    final data = await _client.get('/dashboard/performance-metrics', queryParams: params);
     return PerformanceMetricsResponse.fromJson(data);
   }
 

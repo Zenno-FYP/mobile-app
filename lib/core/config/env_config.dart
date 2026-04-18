@@ -49,12 +49,18 @@ abstract final class EnvConfig {
     return url;
   }
 
+  /// Returns the bare scheme + host (+ port) of the backend, with no path.
+  /// Used as the Socket.IO connection target so the `/chat` namespace can be
+  /// appended cleanly without colliding with `/api/v1`.
+  ///
+  /// We rely on `Uri` parsing rather than substring math because the previous
+  /// `indexOf('/api')` approach incorrectly matched the `/a` that appears
+  /// inside `://api.zenno.dev`, producing a malformed origin like `https:/`.
   static String get socketOrigin {
-    var url = _rawBaseUrl;
-    if (url.endsWith('/')) url = url.substring(0, url.length - 1);
-    final idx = url.indexOf('/api');
-    if (idx > 0) return url.substring(0, idx);
-    return url;
+    final uri = Uri.parse(_rawBaseUrl);
+    final buffer = StringBuffer('${uri.scheme}://${uri.host}');
+    if (uri.hasPort) buffer.write(':${uri.port}');
+    return buffer.toString();
   }
 
   static bool get isDev => env == 'dev';
