@@ -5,9 +5,11 @@ import '../../../../app/theme/app_colors.dart';
 import '../../data/models/dashboard_models.dart';
 
 class DeveloperTrendsChart extends StatelessWidget {
-  const DeveloperTrendsChart({super.key, required this.data});
+  const DeveloperTrendsChart({super.key, required this.data, this.filter = 'all'});
 
   final List<UsageTrendBar> data;
+  /// One of: 'all', 'flow', 'debugging', 'research', 'communication', 'distracted'
+  final String filter;
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +64,11 @@ class DeveloperTrendsChart extends StatelessWidget {
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
-          _line(data.map((e) => e.flowHours).toList(), AppColors.chartFlow),
-          _line(data.map((e) => e.debuggingHours).toList(), AppColors.chartDebugging),
-          _line(data.map((e) => e.researchHours).toList(), AppColors.chartResearch),
-          _line(data.map((e) => e.communicationHours).toList(), AppColors.chartCommunication),
-          _line(data.map((e) => e.distractedHours).toList(), AppColors.chartDistracted),
+          if (filter == 'all' || filter == 'flow')          _line(data.map((e) => e.flowHours).toList(),          AppColors.chartFlow),
+          if (filter == 'all' || filter == 'debugging')     _line(data.map((e) => e.debuggingHours).toList(),    AppColors.chartDebugging),
+          if (filter == 'all' || filter == 'research')      _line(data.map((e) => e.researchHours).toList(),     AppColors.chartResearch),
+          if (filter == 'all' || filter == 'communication') _line(data.map((e) => e.communicationHours).toList(),AppColors.chartCommunication),
+          if (filter == 'all' || filter == 'distracted')    _line(data.map((e) => e.distractedHours).toList(),   AppColors.chartDistracted),
         ],
         lineTouchData: const LineTouchData(enabled: false),
       ),

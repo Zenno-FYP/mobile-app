@@ -107,16 +107,23 @@ class DailyBehaviorMetrics {
 }
 
 class PerformanceMetricsDetailResponse {
-  PerformanceMetricsDetailResponse({required this.period, required this.performanceSummary, required this.dailySeries});
+  PerformanceMetricsDetailResponse({
+    required this.period,
+    required this.performanceSummary,
+    required this.dailySeries,
+    required this.usageTrendGraph,
+  });
   final String period;
   final PerformanceSummary performanceSummary;
   final List<DailyBehaviorMetrics> dailySeries;
+  final List<UsageTrendBar> usageTrendGraph;
 
   factory PerformanceMetricsDetailResponse.fromJson(Map<String, dynamic> json) {
     return PerformanceMetricsDetailResponse(
       period: json['period'] as String? ?? '',
       performanceSummary: PerformanceSummary.fromJson(json['performance_summary'] as Map<String, dynamic>),
       dailySeries: (json['daily_series'] as List?)?.map((e) => DailyBehaviorMetrics.fromJson(e as Map<String, dynamic>)).toList() ?? [],
+      usageTrendGraph: (json['usage_trend_graph'] as List?)?.map((e) => UsageTrendBar.fromJson(e as Map<String, dynamic>)).toList() ?? [],
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,32 +12,192 @@ import '../../../shared/widgets/section_header.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../dashboard/data/models/dashboard_models.dart';
+import '../../dashboard/presentation/widgets/developer_trends_chart.dart';
 
-final _detailProvider = FutureProvider<PerformanceMetricsDetailResponse>((ref) {
-  return DashboardRepository(ref.watch(apiClientProvider)).getPerformanceMetricsDetail();
+// ─── Period config ──────────────────────────────────────────────────────────
+
+typedef _PeriodEntry = ({String value, String label, String compare});
+const List<_PeriodEntry> _kPeriods = [
+  (value: 'week',    label: 'Week',     compare: 'vs prior week'),
+  (value: 'month',   label: 'Month',    compare: 'vs prior month'),
+  (value: '90days',  label: '90 Days',  compare: 'vs prior 90 days'),
+  (value: '6months', label: '6 Months', compare: 'vs prior 6 months'),
+];
+
+// ─── Trend filter config ─────────────────────────────────────────────────────
+
+typedef _FilterEntry = ({String value, String label, Color color});
+const List<_FilterEntry> _kFilters = [
+  (value: 'all',           label: 'All',           color: AppColors.primaryStart),
+  (value: 'flow',          label: 'Flow',          color: AppColors.chartFlow),
+  (value: 'debugging',     label: 'Debugging',     color: AppColors.chartDebugging),
+  (value: 'research',      label: 'Research',      color: AppColors.chartResearch),
+  (value: 'communication', label: 'Communication', color: AppColors.chartCommunication),
+  (value: 'distracted',    label: 'Distracted',    color: AppColors.chartDistracted),
+];
+
+// ─── Breakdown grouping ──────────────────────────────────────────────────────
+
+class _BreakdownRow {
+  _BreakdownRow({
+    required this.label,
+    required this.sublabel,
+    required this.kpm,
+    required this.cpm,
+    required this.correction,
+    required this.activeHours,
+    required this.idleHours,
+  });
+  final String label, sublabel;
+  final double kpm, cpm, correction, activeHours, idleHours;
+}
+
+List<_BreakdownRow> _buildBreakdownRows(
+  List<DailyBehaviorMetrics> daily,
+  String period,
+) {
+  if (period == 'week') {
+    return daily
+        .map((d) => _BreakdownRow(
+              label: d.dayName,
+              sublabel: d.date,
+              kpm: d.typingIntensityKpm,
+              cpm: d.mouseClickRateCpm,
+              correction: d.correctionRatePercent,
+              activeHours: d.activeHours,
+              idleHours: d.idleHours,
+            ))
+        .toList();
+  }
+
+  if (period == 'month' || period == '90days') {
+    final rows = <_BreakdownRow>[];
+    for (int i = 0; i < daily.length; i += 7) {
+      final chunk = daily.sublist(i, min(i + 7, daily.length));
+      final active = chunk.where((d) => d.activeHours > 0).toList();
+      double avg(double Function(DailyBehaviorMetrics d) fn) =>
+          active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
+      rows.add(_BreakdownRow(
+        label: 'Wk ${i ~/ 7 + 1}',
+        sublabel: '${chunk.first.date} – ${chunk.last.date}',
+        kpm: avg((d) => d.typingIntensityKpm),
+        cpm: avg((d) => d.mouseClickRateCpm),
+        correction: avg((d) => d.correctionRatePercent),
+        activeHours: chunk.map((d) => d.activeHours).reduce((a, b) => a + b),
+        idleHours: chunk.map((d) => d.idleHours).reduce((a, b) => a + b),
+      ));
+    }
+    return rows;
+  }
+
+  // 6months → group by calendar month
+  final monthMap = <String, List<DailyBehaviorMetrics>>{};
+  for (final d in daily) {
+    monthMap.putIfAbsent(d.date.substring(0, 7), () => []).add(d);
+  }
+  const monthNames = [
+    'Jan','Feb','Mar','Apr','May','Jun',
+    'Jul','Aug','Sep','Oct','Nov','Dec',
+  ];
+  return monthMap.entries.map((e) {
+    final parts = e.key.split('-');
+    final days = e.value;
+    final active = days.where((d) => d.activeHours > 0).toList();
+    double avg(double Function(DailyBehaviorMetrics d) fn) =>
+        active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
+    return _BreakdownRow(
+      label: '${monthNames[int.parse(parts[1]) - 1]} ${parts[0]}',
+      sublabel: '${days.length} days',
+      kpm: avg((d) => d.typingIntensityKpm),
+      cpm: avg((d) => d.mouseClickRateCpm),
+      correction: avg((d) => d.correctionRatePercent),
+      activeHours: days.map((d) => d.activeHours).reduce((a, b) => a + b),
+      idleHours: days.map((d) => d.idleHours).reduce((a, b) => a + b),
+    );
+  }).toList();
+}
+
+String _breakdownTitle(String period) {
+  if (period == 'week')    return 'Daily Details';
+  if (period == '6months') return 'Monthly Details';
+  return 'Weekly Details';
+}
+
+// ─── Provider ────────────────────────────────────────────────────────────────
+
+final _detailProvider =
+    FutureProvider.family<PerformanceMetricsDetailResponse, String>((ref, period) {
+  return DashboardRepository(ref.watch(apiClientProvider))
+      .getPerformanceMetricsDetail(period: period);
 });
 
-class MetricsDetailScreen extends ConsumerWidget {
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
+class MetricsDetailScreen extends ConsumerStatefulWidget {
   const MetricsDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MetricsDetailScreen> createState() => _MetricsDetailScreenState();
+}
+
+class _MetricsDetailScreenState extends ConsumerState<MetricsDetailScreen> {
+  String _period = 'week';
+  String _trendFilter = 'all';
+
+  void _setPeriod(String v) => setState(() { _period = v; _trendFilter = 'all'; });
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final detail = ref.watch(_detailProvider);
+    final detail = ref.watch(_detailProvider(_period));
+    final periodEntry = _kPeriods.firstWhere((p) => p.value == _period);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Performance Metrics')),
+      appBar: AppBar(
+        title: const Text('Performance Metrics'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _PeriodDropdown(
+              period: _period,
+              isDark: isDark,
+              onChanged: _setPeriod,
+            ),
+          ),
+        ],
+      ),
       body: detail.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryStart)),
-        error: (e, _) => ErrorState(message: e.toString(), onRetry: () => ref.invalidate(_detailProvider)),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.primaryStart)),
+        error: (e, _) => ErrorState(
+          message: e.toString(),
+          onRetry: () => ref.invalidate(_detailProvider(_period)),
+        ),
         data: (data) {
           final s = data.performanceSummary;
+          final breakdownRows = _buildBreakdownRows(data.dailySeries, _period);
+
           return RefreshIndicator(
             color: AppColors.primaryStart,
-            onRefresh: () async => ref.invalidate(_detailProvider),
+            onRefresh: () async => ref.invalidate(_detailProvider(_period)),
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Period subtitle
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '${periodEntry.label} overview — ${periodEntry.compare}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppColors.darkSecondaryText
+                          : AppColors.lightSecondaryText,
+                    ),
+                  ),
+                ),
+
+                // Summary metrics grid
                 GlassCard(
                   child: Column(
                     children: [
@@ -50,71 +212,230 @@ class MetricsDetailScreen extends ConsumerWidget {
                         childAspectRatio: 1.3,
                         children: [
                           MetricTile(
-                            icon: Icons.keyboard, label: 'Typing (KPM)',
+                            icon: Icons.keyboard,
+                            label: 'Typing (KPM)',
                             value: s.avgTypingIntensity.value.toStringAsFixed(1),
                             changePercent: s.avgTypingIntensity.changePercent,
                           ),
                           MetricTile(
-                            icon: Icons.access_time, label: 'Active hrs/day',
+                            icon: Icons.access_time,
+                            label: 'Active hrs/day',
                             value: s.dailyActiveAverage.value.toStringAsFixed(1),
                             changePercent: s.dailyActiveAverage.changePercent,
-                            gradient: const LinearGradient(colors: [AppColors.teal, AppColors.tealDark]),
+                            gradient: const LinearGradient(
+                                colors: [AppColors.teal, AppColors.tealDark]),
                           ),
                           MetricTile(
-                            icon: Icons.mouse, label: 'Mouse (CPM)',
+                            icon: Icons.mouse,
+                            label: 'Mouse (CPM)',
                             value: s.avgMouseClickRate.value.toStringAsFixed(1),
                             changePercent: s.avgMouseClickRate.changePercent,
-                            gradient: const LinearGradient(colors: [AppColors.yellow, AppColors.yellowDark]),
+                            gradient: const LinearGradient(
+                                colors: [AppColors.yellow, AppColors.yellowDark]),
                           ),
                           MetricTile(
-                            icon: Icons.backspace_outlined, label: 'Corrections',
-                            value: '${s.avgCorrections.value.toStringAsFixed(1)}%',
+                            icon: Icons.backspace_outlined,
+                            label: 'Corrections',
+                            value:
+                                '${s.avgCorrections.value.toStringAsFixed(1)}%',
                             changePercent: s.avgCorrections.changePercent,
-                            gradient: const LinearGradient(colors: [AppColors.pink, AppColors.pinkLight]),
+                            gradient: const LinearGradient(
+                                colors: [AppColors.pink, AppColors.pinkLight]),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
+                // Developer Trends with filter chips
+                if (data.usageTrendGraph.isNotEmpty) ...[
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SectionHeader(
+                          title: 'Developer Trends',
+                          icon: Icons.show_chart,
+                          trailing: Icon(Icons.chevron_right,
+                              color: isDark
+                                  ? AppColors.darkSecondaryText
+                                  : AppColors.lightSecondaryText),
+                        ),
+                        const SizedBox(height: 10),
+                        // Filter chips — scrollable row
+                        SizedBox(
+                          height: 32,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: _kFilters.map((f) {
+                              final selected = _trendFilter == f.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _trendFilter = f.value),
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      color: selected
+                                          ? f.color.withValues(alpha: 0.15)
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: selected
+                                            ? f.color.withValues(alpha: 0.7)
+                                            : (isDark
+                                                ? const Color(0x33FFFFFF)
+                                                : const Color(0x33000000)),
+                                        width: selected ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '● ${f.label}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: selected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                        color: selected
+                                            ? f.color
+                                            : (isDark
+                                                ? AppColors.darkSecondaryText
+                                                : AppColors.lightSecondaryText),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 200,
+                          child: DeveloperTrendsChart(
+                            data: data.usageTrendGraph,
+                            filter: _trendFilter,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Typing & click intensity bar chart (grouped by period)
                 GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SectionHeader(title: 'Daily Breakdown', icon: Icons.bar_chart),
+                      SectionHeader(
+                        title: 'Typing & click intensity',
+                        icon: Icons.bar_chart,
+                        trailing: Text(
+                          _period == 'week'
+                              ? 'Daily · KPM & CPM'
+                              : _period == '6months'
+                                  ? 'Monthly · KPM & CPM'
+                                  : 'Weekly · KPM & CPM',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 200,
-                        child: _DailyChart(series: data.dailySeries, isDark: isDark),
+                        child: _DailyChart(
+                          points: _groupChartData(data.dailySeries, _period),
+                          isDark: isDark,
+                        ),
                       ),
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
+                // Grouped breakdown list
                 GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SectionHeader(title: 'Daily Details', icon: Icons.list_alt),
+                      SectionHeader(
+                        title: _breakdownTitle(_period),
+                        icon: Icons.list_alt,
+                        trailing: Text(
+                          '${breakdownRows.length} ${_period == '6months' ? 'months' : _period == 'week' ? 'days' : 'weeks'}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 12),
-                      ...data.dailySeries.map((d) => Padding(
+                      ...breakdownRows.map((row) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: Row(
                               children: [
                                 SizedBox(
-                                  width: 36,
-                                  child: Text(d.dayName, style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText)),
+                                  width: 52,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(row.label,
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark
+                                                  ? AppColors.darkText
+                                                  : AppColors.lightText)),
+                                      Text(
+                                        row.sublabel.length > 8
+                                            ? row.sublabel
+                                                .split(' ')
+                                                .first
+                                            : row.sublabel,
+                                        style: TextStyle(
+                                            fontSize: 9,
+                                            color: isDark
+                                                ? AppColors.darkSecondaryText
+                                                : AppColors.lightSecondaryText),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text('Active: ${d.activeHours.toStringAsFixed(1)}h  Idle: ${d.idleHours.toStringAsFixed(1)}h',
-                                          style: const TextStyle(fontSize: 13)),
+                                      Text(
+                                        'Active: ${_fmtH(row.activeHours)}  Idle: ${_fmtH(row.idleHours)}',
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
                                       const SizedBox(height: 2),
-                                      Text('KPM: ${d.typingIntensityKpm.toStringAsFixed(0)}  CPM: ${d.mouseClickRateCpm.toStringAsFixed(0)}  Corrections: ${d.correctionRatePercent.toStringAsFixed(1)}%',
-                                          style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText)),
+                                      Text(
+                                        'KPM: ${row.kpm.toStringAsFixed(0)}  CPM: ${row.cpm.toStringAsFixed(0)}  Corr: ${row.correction.toStringAsFixed(1)}%',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? AppColors.darkSecondaryText
+                                                : AppColors.lightSecondaryText),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -131,29 +452,151 @@ class MetricsDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  String _fmtH(double h) =>
+      h < 1 ? '${(h * 60).round()}m' : '${h.toStringAsFixed(1)}h';
 }
 
+// ─── Period dropdown ──────────────────────────────────────────────────────────
+
+class _PeriodDropdown extends StatelessWidget {
+  const _PeriodDropdown({
+    required this.period,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  final String period;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? const Color(0x33FFFFFF) : const Color(0x33000000),
+        ),
+        color: isDark ? const Color(0x0DFFFFFF) : const Color(0x0D000000),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: period,
+          isDense: true,
+          icon: const Icon(Icons.expand_more, size: 16),
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+          dropdownColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          items: _kPeriods
+              .map((p) => DropdownMenuItem(value: p.value, child: Text(p.label)))
+              .toList(),
+          onChanged: (v) { if (v != null) onChanged(v); },
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Chart grouping ───────────────────────────────────────────────────────────
+
+class _ChartPoint {
+  _ChartPoint({required this.label, required this.kpm, required this.cpm});
+  final String label;
+  final double kpm, cpm;
+}
+
+List<_ChartPoint> _groupChartData(List<DailyBehaviorMetrics> daily, String period) {
+  if (period == 'week') {
+    return daily
+        .map((d) => _ChartPoint(
+              label: d.dayName,
+              kpm: d.typingIntensityKpm,
+              cpm: d.mouseClickRateCpm,
+            ))
+        .toList();
+  }
+
+  if (period == 'month' || period == '90days') {
+    final result = <_ChartPoint>[];
+    for (int i = 0; i < daily.length; i += 7) {
+      final chunk = daily.sublist(i, min(i + 7, daily.length));
+      final active = chunk.where((d) => d.activeHours > 0).toList();
+      double avg(double Function(DailyBehaviorMetrics d) fn) =>
+          active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
+      result.add(_ChartPoint(
+        label: 'Wk ${i ~/ 7 + 1}',
+        kpm: avg((d) => d.typingIntensityKpm),
+        cpm: avg((d) => d.mouseClickRateCpm),
+      ));
+    }
+    return result;
+  }
+
+  // 6months → group by calendar month
+  final monthMap = <String, List<DailyBehaviorMetrics>>{};
+  for (final d in daily) {
+    monthMap.putIfAbsent(d.date.substring(0, 7), () => []).add(d);
+  }
+  const monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return monthMap.entries.map((e) {
+    final parts = e.key.split('-');
+    final days = e.value;
+    final active = days.where((d) => d.activeHours > 0).toList();
+    double avg(double Function(DailyBehaviorMetrics d) fn) =>
+        active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
+    return _ChartPoint(
+      label: monthNames[int.parse(parts[1]) - 1],
+      kpm: avg((d) => d.typingIntensityKpm),
+      cpm: avg((d) => d.mouseClickRateCpm),
+    );
+  }).toList();
+}
+
+// ─── KPM / CPM grouped bar chart ─────────────────────────────────────────────
+
 class _DailyChart extends StatelessWidget {
-  const _DailyChart({required this.series, required this.isDark});
-  final List<DailyBehaviorMetrics> series;
+  const _DailyChart({required this.points, required this.isDark});
+  final List<_ChartPoint> points;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    if (series.isEmpty) return const Center(child: Text('No data'));
+    if (points.isEmpty) return const Center(child: Text('No data'));
+
+    // Narrow bars for many groups (90-day weekly = ~13 groups)
+    final bw = points.length > 12 ? 5.0 : points.length > 7 ? 7.0 : 10.0;
 
     return BarChart(
       BarChartData(
-        barGroups: List.generate(series.length, (i) {
-          final d = series[i];
-          return BarChartGroupData(x: i, barRods: [
-            BarChartRodData(
-              toY: d.activeHours,
-              width: 16,
-              borderRadius: BorderRadius.circular(4),
-              gradient: AppColors.primaryGradient,
-            ),
-          ]);
+        groupsSpace: 4,
+        barGroups: List.generate(points.length, (i) {
+          final p = points[i];
+          return BarChartGroupData(
+            x: i,
+            barsSpace: 2,
+            barRods: [
+              BarChartRodData(
+                toY: p.kpm,
+                width: bw,
+                color: AppColors.primaryStart,
+                borderRadius: BorderRadius.circular(3),
+              ),
+              BarChartRodData(
+                toY: p.cpm,
+                width: bw,
+                color: AppColors.teal,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ],
+          );
         }),
         titlesData: FlTitlesData(
           leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -164,10 +607,16 @@ class _DailyChart extends StatelessWidget {
               showTitles: true,
               getTitlesWidget: (value, _) {
                 final idx = value.toInt();
-                if (idx < 0 || idx >= series.length) return const SizedBox.shrink();
+                if (idx < 0 || idx >= points.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text(series[idx].dayName, style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText)),
+                  child: Text(
+                    points[idx].label,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+                    ),
+                  ),
                 );
               },
             ),
@@ -175,7 +624,15 @@ class _DailyChart extends StatelessWidget {
         ),
         borderData: FlBorderData(show: false),
         gridData: const FlGridData(show: false),
-        barTouchData: BarTouchData(enabled: false),
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, _, rod, rodIndex) {
+              final p = points[group.x];
+              final label = rodIndex == 0 ? 'KPM: ${p.kpm.toStringAsFixed(1)}' : 'CPM: ${p.cpm.toStringAsFixed(1)}';
+              return BarTooltipItem(label, const TextStyle(fontSize: 11, color: Colors.white));
+            },
+          ),
+        ),
       ),
     );
   }
