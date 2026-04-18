@@ -24,8 +24,8 @@ class DashboardRepository {
     return ToolUsageResponse.fromJson(data);
   }
 
-  Future<ToolUsageDetailResponse> getToolUsageDetail() async {
-    final data = await _client.get('/dashboard/tool-usage-detail');
+  Future<ToolUsageDetailResponse> getToolUsageDetail({String period = 'week'}) async {
+    final data = await _client.get('/dashboard/tool-usage-detail', queryParams: {'period': period});
     return ToolUsageDetailResponse.fromJson(data);
   }
 
