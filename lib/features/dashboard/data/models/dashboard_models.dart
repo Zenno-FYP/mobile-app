@@ -208,6 +208,7 @@ class ToolUsageDetailResponse {
   ToolUsageDetailResponse({
     required this.period,
     required this.uniqueAppsCount,
+    required this.vsPriorPeriodPercent,
     required this.categoryBreakdown,
     required this.dailyAppUsage,
     required this.topApps,
@@ -215,6 +216,7 @@ class ToolUsageDetailResponse {
   });
   final String period;
   final int uniqueAppsCount;
+  final double vsPriorPeriodPercent;
   final List<AppCategoryUsage> categoryBreakdown;
   final List<DailyAppUsage> dailyAppUsage;
   final TopApps topApps;
@@ -223,6 +225,7 @@ class ToolUsageDetailResponse {
   factory ToolUsageDetailResponse.fromJson(Map<String, dynamic> json) => ToolUsageDetailResponse(
         period: json['period'] as String? ?? '',
         uniqueAppsCount: (json['unique_apps_count'] as num?)?.toInt() ?? 0,
+        vsPriorPeriodPercent: (json['vs_prior_period_percent'] as num?)?.toDouble() ?? 0.0,
         categoryBreakdown: (json['category_breakdown'] as List?)?.map((e) => AppCategoryUsage.fromJson(e as Map<String, dynamic>)).toList() ?? [],
         dailyAppUsage: (json['daily_app_usage'] as List?)?.map((e) => DailyAppUsage.fromJson(e as Map<String, dynamic>)).toList() ?? [],
         topApps: TopApps.fromJson(json['top_apps'] as Map<String, dynamic>),

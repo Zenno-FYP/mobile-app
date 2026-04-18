@@ -18,10 +18,10 @@ import '../../dashboard/presentation/widgets/developer_trends_chart.dart';
 
 typedef _PeriodEntry = ({String value, String label, String compare});
 const List<_PeriodEntry> _kPeriods = [
-  (value: 'week',    label: 'Week',     compare: 'vs prior week'),
-  (value: 'month',   label: 'Month',    compare: 'vs prior month'),
-  (value: '90days',  label: '90 Days',  compare: 'vs prior 90 days'),
-  (value: '6months', label: '6 Months', compare: 'vs prior 6 months'),
+  (value: 'week',    label: 'This week',     compare: 'vs prior week'),
+  (value: 'month',   label: 'Last month',    compare: 'vs prior month'),
+  (value: '90days',  label: 'Last 90 days',  compare: 'vs prior 90 days'),
+  (value: '6months', label: 'Last 6 months', compare: 'vs prior 6 months'),
 ];
 
 // ─── Trend filter config ─────────────────────────────────────────────────────
