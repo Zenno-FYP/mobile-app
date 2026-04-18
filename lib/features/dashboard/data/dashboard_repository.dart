@@ -11,8 +11,11 @@ class DashboardRepository {
     return PerformanceMetricsResponse.fromJson(data);
   }
 
-  Future<PerformanceMetricsDetailResponse> getPerformanceMetricsDetail() async {
-    final data = await _client.get('/dashboard/performance-metrics-detail');
+  Future<PerformanceMetricsDetailResponse> getPerformanceMetricsDetail({String period = 'week'}) async {
+    final data = await _client.get(
+      '/dashboard/performance-metrics-detail',
+      queryParams: {'period': period},
+    );
     return PerformanceMetricsDetailResponse.fromJson(data);
   }
 
