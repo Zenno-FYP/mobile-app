@@ -69,6 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Standalone routes (no bottom nav)
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
@@ -81,6 +82,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/verify-email',
         builder: (context, state) => const VerifyEmailScreen(),
       ),
+
+      // Full-screen routes that push above the shell (no bottom nav).
+      // These live at the root navigator level on purpose; defining them as
+      // direct children of the ShellRoute with parentNavigatorKey =
+      // _rootNavigatorKey is not allowed by go_router.
+      GoRoute(
+        path: '/analytics/metrics',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const MetricsDetailScreen(),
+      ),
+      GoRoute(
+        path: '/analytics/apps-languages',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AppsLanguagesScreen(),
+      ),
+      GoRoute(
+        path: '/analytics/skills-projects',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SkillsProjectsScreen(),
+      ),
+      GoRoute(
+        path: '/projects/:projectName',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => ProjectDetailScreen(
+          projectName: state.pathParameters['projectName']!,
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // Bottom-nav shell routes
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) => AppShell(child: child),
@@ -97,6 +132,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: ConversationsScreen(),
             ),
             routes: [
+              // Nested sub-route - allowed to escape to root navigator
+              // because it isn't a direct child of the ShellRoute.
               GoRoute(
                 path: ':conversationId',
                 parentNavigatorKey: _rootNavigatorKey,
@@ -142,33 +179,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => const NoTransitionPage(
               child: AgentScreen(),
             ),
-          ),
-          GoRoute(
-            path: '/analytics/metrics',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, state) => const MetricsDetailScreen(),
-          ),
-          GoRoute(
-            path: '/analytics/apps-languages',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, state) => const AppsLanguagesScreen(),
-          ),
-          GoRoute(
-            path: '/analytics/skills-projects',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, state) => const SkillsProjectsScreen(),
-          ),
-          GoRoute(
-            path: '/projects/:projectName',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, state) => ProjectDetailScreen(
-              projectName: state.pathParameters['projectName']!,
-            ),
-          ),
-          GoRoute(
-            path: '/notifications',
-            parentNavigatorKey: _rootNavigatorKey,
-            builder: (context, state) => const NotificationsScreen(),
           ),
         ],
       ),

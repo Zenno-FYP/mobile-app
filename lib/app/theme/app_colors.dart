@@ -68,13 +68,4 @@ abstract final class AppColors {
     colors: [primaryStart, primaryEnd],
   );
 
-  static const agentCardGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xE67C4DFF), // 90%
-      Color(0xE66B5FD8),
-      Color(0xE65B6FD8),
-    ],
-  );
 }

@@ -15,31 +15,50 @@ import '../data/dashboard_repository.dart';
 import '../data/models/dashboard_models.dart';
 import 'widgets/developer_trends_chart.dart';
 
-final _dashboardRepoProvider = Provider((ref) {
-  return DashboardRepository(ref.watch(apiClientProvider));
+// Family provider — keyed by period string so toggling triggers a fresh fetch.
+final _metricsProvider =
+    FutureProvider.family<PerformanceMetricsResponse, String>((ref, period) {
+  return ref.watch(_dashboardRepoProvider).getPerformanceMetrics(period: period);
 });
 
-final _metricsProvider = FutureProvider<PerformanceMetricsResponse>((ref) {
-  return ref.watch(_dashboardRepoProvider).getPerformanceMetrics();
-});
+final _dashboardRepoProvider =
+    Provider((ref) => DashboardRepository(ref.watch(apiClientProvider)));
 
 final _toolUsageProvider = FutureProvider<ToolUsageResponse>((ref) {
   return ref.watch(_dashboardRepoProvider).getToolUsage();
+});
+
+final _allTimeAppsProvider = FutureProvider<List<ProfileGlobalRow>>((ref) async {
+  final page = await ref.watch(_dashboardRepoProvider).getProfilePage();
+  return page.topApps;
 });
 
 final _insightsProvider = FutureProvider<ProjectInsightsResponse>((ref) {
   return ref.watch(_dashboardRepoProvider).getProjectInsights();
 });
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  String _period = 'current_week';
+
+  void _togglePeriod(String p) {
+    if (_period == p) return;
+    setState(() => _period = p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(currentUserProvider);
-    final metrics = ref.watch(_metricsProvider);
+    final metrics = ref.watch(_metricsProvider(_period));
     final toolUsage = ref.watch(_toolUsageProvider);
+    final allTimeApps = ref.watch(_allTimeAppsProvider);
     final insights = ref.watch(_insightsProvider);
 
     return Scaffold(
@@ -77,8 +96,9 @@ class DashboardScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.primaryStart,
         onRefresh: () async {
-          ref.invalidate(_metricsProvider);
+          ref.invalidate(_metricsProvider(_period));
           ref.invalidate(_toolUsageProvider);
+          ref.invalidate(_allTimeAppsProvider);
           ref.invalidate(_insightsProvider);
         },
         child: ListView(
@@ -102,10 +122,12 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Here\'s your developer overview',
+                          "Here's your developer overview",
                           style: TextStyle(
                             fontSize: 14,
-                            color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
                           ),
                         ),
                       ],
@@ -126,11 +148,13 @@ class DashboardScreen extends ConsumerWidget {
 
             const SizedBox(height: 16),
 
-            // Key Metrics
+            // Performance Metrics
             metrics.when(
-              data: (data) => _buildMetrics(context, data, ref),
+              data: (data) => _buildMetrics(context, data, isDark),
               loading: () => const _MetricsShimmer(),
-              error: (e, _) => ErrorState(message: e.toString(), onRetry: () => ref.invalidate(_metricsProvider)),
+              error: (e, _) => ErrorState(
+                  message: e.toString(),
+                  onRetry: () => ref.invalidate(_metricsProvider(_period))),
             ),
 
             const SizedBox(height: 16),
@@ -145,8 +169,24 @@ class DashboardScreen extends ConsumerWidget {
                     SectionHeader(
                       title: 'Developer Trends',
                       icon: Icons.show_chart,
-                      trailing: Icon(Icons.chevron_right,
-                          color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _WeekChip(
+                            label: '← Prev',
+                            selected: _period == 'previous_week',
+                            isDark: isDark,
+                            onTap: () => _togglePeriod('previous_week'),
+                          ),
+                          const SizedBox(width: 6),
+                          _WeekChip(
+                            label: 'This week',
+                            selected: _period == 'current_week',
+                            isDark: isDark,
+                            onTap: () => _togglePeriod('current_week'),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -163,53 +203,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Top Apps & Languages
-            toolUsage.when(
-              data: (data) => _buildToolUsage(context, data, isDark),
-              loading: () => const ShimmerCard(height: 200),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Zenno Agent Card
-            GlassCard(
-              onTap: () => context.go('/agent'),
-              padding: EdgeInsets.zero,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: AppColors.agentCardGradient,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.smart_toy, color: Colors.white, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Zenno Agent',
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                          SizedBox(height: 4),
-                          Text('Manage preferences & view stats',
-                              style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 13)),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.white70),
-                  ],
-                ),
-              ),
-            ),
+            _buildToolUsage(context, allTimeApps, toolUsage, isDark),
 
             const SizedBox(height: 16),
 
@@ -224,7 +218,9 @@ class DashboardScreen extends ConsumerWidget {
                       title: 'Strongest Skills',
                       icon: Icons.emoji_events,
                       trailing: Icon(Icons.chevron_right,
-                          color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText),
+                          color: isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -232,7 +228,10 @@ class DashboardScreen extends ConsumerWidget {
                       runSpacing: 8,
                       children: data.strongestSkills
                           .take(5)
-                          .map((s) => TagBadge(label: '${s.name} ${s.percent.toStringAsFixed(0)}%', isGradient: true))
+                          .map((s) => TagBadge(
+                              label:
+                                  '${s.name} ${s.percent.toStringAsFixed(0)}%',
+                              isGradient: true))
                           .toList(),
                     ),
                   ],
@@ -255,13 +254,16 @@ class DashboardScreen extends ConsumerWidget {
                       title: 'Recent Projects',
                       icon: Icons.folder_open,
                       trailing: Icon(Icons.chevron_right,
-                          color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText),
+                          color: isDark
+                              ? AppColors.darkSecondaryText
+                              : AppColors.lightSecondaryText),
                     ),
                     const SizedBox(height: 12),
                     ...data.currentProjects.take(5).map((p) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: GestureDetector(
-                            onTap: () => context.push('/projects/${Uri.encodeComponent(p.name)}'),
+                            onTap: () => context
+                                .push('/projects/${Uri.encodeComponent(p.name)}'),
                             child: Row(
                               children: [
                                 Container(
@@ -278,12 +280,17 @@ class DashboardScreen extends ConsumerWidget {
                                     p.displayName ?? p.name,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: isDark ? AppColors.darkText : AppColors.lightText,
+                                      color: isDark
+                                          ? AppColors.darkText
+                                          : AppColors.lightText,
                                     ),
                                   ),
                                 ),
-                                Icon(Icons.chevron_right, size: 18,
-                                    color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText),
+                                Icon(Icons.chevron_right,
+                                    size: 18,
+                                    color: isDark
+                                        ? AppColors.darkSecondaryText
+                                        : AppColors.lightSecondaryText),
                               ],
                             ),
                           ),
@@ -300,14 +307,21 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetrics(BuildContext context, PerformanceMetricsResponse data, WidgetRef ref) {
+  Widget _buildMetrics(BuildContext context, PerformanceMetricsResponse data, bool isDark) {
     final s = data.performanceSummary;
     return GlassCard(
       onTap: () => context.push('/analytics/metrics'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'Key Metrics', icon: Icons.speed),
+          SectionHeader(
+            title: 'Performance Metrics',
+            icon: Icons.speed,
+            trailing: Icon(Icons.chevron_right,
+                color: isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText),
+          ),
           const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: 2,
@@ -322,28 +336,32 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'Typing (KPM)',
                 value: s.avgTypingIntensity.value.toStringAsFixed(1),
                 changePercent: s.avgTypingIntensity.changePercent,
-                gradient: const LinearGradient(colors: [AppColors.primaryStart, AppColors.primaryEnd]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.primaryStart, AppColors.primaryEnd]),
               ),
               MetricTile(
                 icon: Icons.access_time,
                 label: 'Active hrs/day',
                 value: s.dailyActiveAverage.value.toStringAsFixed(1),
                 changePercent: s.dailyActiveAverage.changePercent,
-                gradient: const LinearGradient(colors: [AppColors.teal, AppColors.tealDark]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.teal, AppColors.tealDark]),
               ),
               MetricTile(
                 icon: Icons.mouse,
                 label: 'Mouse (CPM)',
                 value: s.avgMouseClickRate.value.toStringAsFixed(1),
                 changePercent: s.avgMouseClickRate.changePercent,
-                gradient: const LinearGradient(colors: [AppColors.yellow, AppColors.yellowDark]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.yellow, AppColors.yellowDark]),
               ),
               MetricTile(
                 icon: Icons.backspace_outlined,
                 label: 'Corrections',
                 value: '${s.avgCorrections.value.toStringAsFixed(1)}%',
                 changePercent: s.avgCorrections.changePercent,
-                gradient: const LinearGradient(colors: [AppColors.pink, AppColors.pinkLight]),
+                gradient: const LinearGradient(
+                    colors: [AppColors.pink, AppColors.pinkLight]),
               ),
             ],
           ),
@@ -352,7 +370,16 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildToolUsage(BuildContext context, ToolUsageResponse data, bool isDark) {
+  Widget _buildToolUsage(
+    BuildContext context,
+    AsyncValue<List<ProfileGlobalRow>> appsAsync,
+    AsyncValue<ToolUsageResponse> toolUsageAsync,
+    bool isDark,
+  ) {
+    final secondaryColor =
+        isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText;
+    final chevron = Icon(Icons.chevron_right, color: secondaryColor);
+
     return GlassCard(
       onTap: () => context.push('/analytics/apps-languages'),
       child: Column(
@@ -361,57 +388,162 @@ class DashboardScreen extends ConsumerWidget {
           SectionHeader(
             title: 'Top Apps & Languages',
             icon: Icons.apps,
-            trailing: Icon(Icons.chevron_right,
-                color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText),
+            trailing: chevron,
           ),
           const SizedBox(height: 12),
-          ...data.topApps.apps.take(3).map((app) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(app.name, style: const TextStyle(fontSize: 14)),
-                    ),
-                    Text(
-                      '${app.durationHours.toStringAsFixed(1)}h',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 60,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: app.percentOfTotal / 100,
-                          minHeight: 6,
-                          backgroundColor: isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE5E7EB),
-                          valueColor: const AlwaysStoppedAnimation(AppColors.primaryStart),
+
+          // ── All-time apps ────────────────────────────────────────────
+          appsAsync.when(
+            loading: () => const _MiniShimmer(),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (apps) {
+              if (apps.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'All time · Top 5',
+                    style: TextStyle(fontSize: 11, color: secondaryColor),
+                  ),
+                  const SizedBox(height: 8),
+                  ...apps.take(5).map((app) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(app.name,
+                                  style: const TextStyle(fontSize: 14),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            Text(
+                              app.durationHours < 1
+                                  ? '${(app.durationHours * 60).round()}m'
+                                  : '${app.durationHours.toStringAsFixed(1)}h',
+                              style: TextStyle(fontSize: 13, color: secondaryColor),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 60,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: app.percent / 100,
+                                  minHeight: 6,
+                                  backgroundColor: isDark
+                                      ? const Color(0x1AFFFFFF)
+                                      : const Color(0xFFE5E7EB),
+                                  valueColor: const AlwaysStoppedAnimation(
+                                      AppColors.primaryStart),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-          if (data.languageDistribution.languages.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: data.languageDistribution.languages.take(5).map((l) =>
-                TagBadge(label: '${l.name} ${l.percent.toStringAsFixed(0)}%'),
-              ).toList(),
-            ),
-          ],
+                      )),
+                ],
+              );
+            },
+          ),
+
+          // ── Languages (LoC-based, already all-time) ──────────────────
+          toolUsageAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (usage) {
+              final langs = usage.languageDistribution.languages;
+              if (langs.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: langs
+                        .take(5)
+                        .map((l) => TagBadge(
+                            label: '${l.name} ${l.percent.toStringAsFixed(0)}%'))
+                        .toList(),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
+}
 
+/// Compact week-selector chip used in section headers.
+class _WeekChip extends StatelessWidget {
+  const _WeekChip({
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: selected
+              ? AppColors.primaryStart.withValues(alpha: 0.15)
+              : Colors.transparent,
+          border: Border.all(
+            color: selected
+                ? AppColors.primaryStart.withValues(alpha: 0.6)
+                : (isDark
+                    ? const Color(0x33FFFFFF)
+                    : const Color(0x33000000)),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected
+                ? AppColors.primaryStart
+                : (isDark
+                    ? AppColors.darkSecondaryText
+                    : AppColors.lightSecondaryText),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniShimmer extends StatelessWidget {
+  const _MiniShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        3,
+        (_) => const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: ShimmerLoader(height: 14, width: double.infinity),
+        ),
+      ),
+    );
+  }
 }
 
 class _MetricsShimmer extends StatelessWidget {
@@ -438,4 +570,3 @@ class _MetricsShimmer extends StatelessWidget {
     );
   }
 }
-
