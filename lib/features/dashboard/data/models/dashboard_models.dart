@@ -185,7 +185,7 @@ class LanguageDistribution {
   final List<LanguageItem> languages;
 
   factory LanguageDistribution.fromJson(Map<String, dynamic> json) => LanguageDistribution(
-        summary: LanguageSummary.fromJson(json['summary'] as Map<String, dynamic>),
+        summary: LanguageSummary.fromJson((json['summary'] as Map<String, dynamic>?) ?? {}),
         languages: (json['languages'] as List?)?.map((e) => LanguageItem.fromJson(e as Map<String, dynamic>)).toList() ?? [],
       );
 }
@@ -228,8 +228,8 @@ class ToolUsageDetailResponse {
         vsPriorPeriodPercent: (json['vs_prior_period_percent'] as num?)?.toDouble() ?? 0.0,
         categoryBreakdown: (json['category_breakdown'] as List?)?.map((e) => AppCategoryUsage.fromJson(e as Map<String, dynamic>)).toList() ?? [],
         dailyAppUsage: (json['daily_app_usage'] as List?)?.map((e) => DailyAppUsage.fromJson(e as Map<String, dynamic>)).toList() ?? [],
-        topApps: TopApps.fromJson(json['top_apps'] as Map<String, dynamic>),
-        languageDistribution: LanguageDistribution.fromJson(json['language_distribution'] as Map<String, dynamic>),
+        topApps: TopApps.fromJson((json['top_apps'] as Map<String, dynamic>?) ?? {}),
+        languageDistribution: LanguageDistribution.fromJson((json['language_distribution'] as Map<String, dynamic>?) ?? {}),
       );
 }
 
