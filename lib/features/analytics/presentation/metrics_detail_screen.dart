@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/metric_tile.dart';
 import '../../../core/widgets/error_state.dart';
@@ -144,6 +146,7 @@ String _breakdownTitle(String period) {
 
 final _detailProvider =
     FutureProvider.family<PerformanceMetricsDetailResponse, String>((ref, period) {
+  ref.watch(userSessionProvider);
   return DashboardRepository(ref.watch(apiClientProvider))
       .getPerformanceMetricsDetail(period: period);
 });
@@ -437,7 +440,7 @@ class _MetricsDetailScreenState extends ConsumerState<MetricsDetailScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Active: ${_fmtH(row.activeHours)}  Idle: ${_fmtH(row.idleHours)}',
+                                        'Active: ${formatHours(row.activeHours)}  Idle: ${formatHours(row.idleHours)}',
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                       const SizedBox(height: 2),
@@ -466,8 +469,6 @@ class _MetricsDetailScreenState extends ConsumerState<MetricsDetailScreen> {
     );
   }
 
-  String _fmtH(double h) =>
-      h < 1 ? '${(h * 60).round()}m' : '${h.toStringAsFixed(1)}h';
 }
 
 // ─── Period dropdown ──────────────────────────────────────────────────────────

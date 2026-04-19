@@ -4,23 +4,29 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state.dart';
 import '../../../shared/widgets/app_avatar.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../notifications/presentation/notification_bell_action.dart';
 import '../data/chat_repository.dart';
 import '../data/models/chat_models.dart';
 import '../data/chat_socket_service.dart';
 
 final chatSocketProvider = Provider<ChatSocketService>((ref) {
+  // Tear the socket down on logout: bumping `userSessionProvider`
+  // invalidates this provider, fires the `onDispose` below, and the next
+  // read creates a fresh service so the next signed-in user gets their
+  // own connection (with their own auth token).
+  ref.watch(userSessionProvider);
   final service = ChatSocketService();
   ref.onDispose(() => service.dispose());
   return service;
 });
 
 final _conversationsProvider = FutureProvider<List<Conversation>>((ref) {
+  ref.watch(userSessionProvider);
   return ChatRepository(ref.watch(apiClientProvider)).getConversations();
 });
 
@@ -48,7 +54,6 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chats'),
-        actions: const [NotificationBellAction()],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.go('/peers'),

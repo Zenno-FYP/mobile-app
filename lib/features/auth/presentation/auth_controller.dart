@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../shared/models/user_model.dart';
 import '../data/auth_repository.dart';
 import '../data/user_remote_ds.dart';
@@ -13,7 +14,15 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
-    onForceLogout: () => ref.read(authRepositoryProvider).signOut(),
+    // Force-logout path (refresh-failure / 401 storm in AuthInterceptor).
+    // Tear down all user-scoped data + the Firebase session so the next
+    // user that signs in on this device starts from a clean slate. Same
+    // sequence as [AuthController.signOut] — keep them in lockstep.
+    onForceLogout: () async {
+      ref.read(currentUserProvider.notifier).state = null;
+      clearUserScopedSession(ref);
+      await ref.read(authRepositoryProvider).signOut();
+    },
   );
 });
 
@@ -164,7 +173,16 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> signOut() async {
+    // Clear in-memory profile + bump the session epoch so every user-
+    // scoped data provider (dashboard, profile, peers, chat, agent prefs,
+    // notifications, ...) is invalidated. Providers that hold long-lived
+    // resources — chiefly the chat socket — get torn down via their
+    // `ref.onDispose` callbacks because they `ref.watch(userSessionProvider)`.
+    // Bumping *before* the Firebase signOut means widgets briefly show a
+    // loading state while the router redirects to /auth, which is far
+    // safer than leaving stale data on screen for the next account.
     _ref.read(currentUserProvider.notifier).state = null;
+    clearUserScopedSession(_ref);
     await _auth.signOut();
   }
 

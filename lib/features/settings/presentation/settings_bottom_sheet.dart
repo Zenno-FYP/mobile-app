@@ -270,18 +270,25 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () async {
+                  // Capture everything we need from `ref` and `context`
+                  // BEFORE popping the sheet — `Navigator.pop` disposes
+                  // this State, after which `ref` throws "Cannot use ref
+                  // after the widget was disposed". Use the root
+                  // navigator's context so router.go() still works once
+                  // this sheet is gone.
+                  final fcm = ref.read(fcmServiceProvider);
+                  final auth = ref.read(authControllerProvider.notifier);
+                  final router = GoRouter.of(context);
                   Navigator.pop(context);
                   // Unregister the active FCM token before signing out so the
                   // backend doesn't keep an orphaned device token tied to this
                   // user. If unregister fails (network), we still proceed with
                   // signOut to avoid trapping the user.
                   try {
-                    await ref.read(fcmServiceProvider).unregister();
+                    await fcm.unregister();
                   } catch (_) {}
-                  await ref
-                      .read(authControllerProvider.notifier)
-                      .signOut();
-                  if (context.mounted) context.go('/auth');
+                  await auth.signOut();
+                  router.go('/auth');
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.red,
