@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -152,6 +153,9 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
       _showSnack('Cannot send: recipient unknown.');
       return;
     }
+
+    // Light tactile confirmation as soon as the user commits to sending.
+    HapticFeedback.lightImpact();
 
     final user = ref.read(currentUserProvider);
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';

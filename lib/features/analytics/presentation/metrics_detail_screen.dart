@@ -38,6 +38,26 @@ const List<_FilterEntry> _kFilters = [
 
 // ─── Breakdown grouping ──────────────────────────────────────────────────────
 
+/// Duration-weighted mean of a numeric field over a set of days.
+///
+/// KPM/CPM/correction% are rates, so a plain arithmetic mean would weight a
+/// 30-minute coding day equally with an 8-hour day. We weight by
+/// `activeHours` to match the backend's window aggregation.
+double _weightedAvgByActiveHours(
+  List<DailyBehaviorMetrics> days,
+  double Function(DailyBehaviorMetrics d) pick,
+) {
+  double weight = 0;
+  double weighted = 0;
+  for (final d in days) {
+    final w = d.activeHours;
+    if (w <= 0) continue;
+    weight += w;
+    weighted += pick(d) * w;
+  }
+  return weight > 0 ? weighted / weight : 0;
+}
+
 class _BreakdownRow {
   _BreakdownRow({
     required this.label,
@@ -74,15 +94,14 @@ List<_BreakdownRow> _buildBreakdownRows(
     final rows = <_BreakdownRow>[];
     for (int i = 0; i < daily.length; i += 7) {
       final chunk = daily.sublist(i, min(i + 7, daily.length));
-      final active = chunk.where((d) => d.activeHours > 0).toList();
-      double avg(double Function(DailyBehaviorMetrics d) fn) =>
-          active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
+      // Rates are duration-weighted; hours are absolute totals.
       rows.add(_BreakdownRow(
         label: 'Wk ${i ~/ 7 + 1}',
         sublabel: '${chunk.first.date} – ${chunk.last.date}',
-        kpm: avg((d) => d.typingIntensityKpm),
-        cpm: avg((d) => d.mouseClickRateCpm),
-        correction: avg((d) => d.correctionRatePercent),
+        kpm: _weightedAvgByActiveHours(chunk, (d) => d.typingIntensityKpm),
+        cpm: _weightedAvgByActiveHours(chunk, (d) => d.mouseClickRateCpm),
+        correction:
+            _weightedAvgByActiveHours(chunk, (d) => d.correctionRatePercent),
         activeHours: chunk.map((d) => d.activeHours).reduce((a, b) => a + b),
         idleHours: chunk.map((d) => d.idleHours).reduce((a, b) => a + b),
       ));
@@ -102,15 +121,13 @@ List<_BreakdownRow> _buildBreakdownRows(
   return monthMap.entries.map((e) {
     final parts = e.key.split('-');
     final days = e.value;
-    final active = days.where((d) => d.activeHours > 0).toList();
-    double avg(double Function(DailyBehaviorMetrics d) fn) =>
-        active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
     return _BreakdownRow(
       label: '${monthNames[int.parse(parts[1]) - 1]} ${parts[0]}',
       sublabel: '${days.length} days',
-      kpm: avg((d) => d.typingIntensityKpm),
-      cpm: avg((d) => d.mouseClickRateCpm),
-      correction: avg((d) => d.correctionRatePercent),
+      kpm: _weightedAvgByActiveHours(days, (d) => d.typingIntensityKpm),
+      cpm: _weightedAvgByActiveHours(days, (d) => d.mouseClickRateCpm),
+      correction:
+          _weightedAvgByActiveHours(days, (d) => d.correctionRatePercent),
       activeHours: days.map((d) => d.activeHours).reduce((a, b) => a + b),
       idleHours: days.map((d) => d.idleHours).reduce((a, b) => a + b),
     );
@@ -256,13 +273,9 @@ class _MetricsDetailScreenState extends ConsumerState<MetricsDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SectionHeader(
+                        const SectionHeader(
                           title: 'Developer Trends',
                           icon: Icons.show_chart,
-                          trailing: Icon(Icons.chevron_right,
-                              color: isDark
-                                  ? AppColors.darkSecondaryText
-                                  : AppColors.lightSecondaryText),
                         ),
                         const SizedBox(height: 10),
                         // Filter chips — scrollable row
@@ -525,13 +538,10 @@ List<_ChartPoint> _groupChartData(List<DailyBehaviorMetrics> daily, String perio
     final result = <_ChartPoint>[];
     for (int i = 0; i < daily.length; i += 7) {
       final chunk = daily.sublist(i, min(i + 7, daily.length));
-      final active = chunk.where((d) => d.activeHours > 0).toList();
-      double avg(double Function(DailyBehaviorMetrics d) fn) =>
-          active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
       result.add(_ChartPoint(
         label: 'Wk ${i ~/ 7 + 1}',
-        kpm: avg((d) => d.typingIntensityKpm),
-        cpm: avg((d) => d.mouseClickRateCpm),
+        kpm: _weightedAvgByActiveHours(chunk, (d) => d.typingIntensityKpm),
+        cpm: _weightedAvgByActiveHours(chunk, (d) => d.mouseClickRateCpm),
       ));
     }
     return result;
@@ -549,13 +559,10 @@ List<_ChartPoint> _groupChartData(List<DailyBehaviorMetrics> daily, String perio
   return monthMap.entries.map((e) {
     final parts = e.key.split('-');
     final days = e.value;
-    final active = days.where((d) => d.activeHours > 0).toList();
-    double avg(double Function(DailyBehaviorMetrics d) fn) =>
-        active.isEmpty ? 0 : active.map(fn).reduce((a, b) => a + b) / active.length;
     return _ChartPoint(
       label: monthNames[int.parse(parts[1]) - 1],
-      kpm: avg((d) => d.typingIntensityKpm),
-      cpm: avg((d) => d.mouseClickRateCpm),
+      kpm: _weightedAvgByActiveHours(days, (d) => d.typingIntensityKpm),
+      cpm: _weightedAvgByActiveHours(days, (d) => d.mouseClickRateCpm),
     );
   }).toList();
 }

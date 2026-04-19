@@ -31,6 +31,24 @@ final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<
   return AuthController(ref);
 });
 
+/// Result of an email/password sign-in attempt.
+///
+/// Distinguishes the "signed in but unverified" case so callers can route
+/// the user to the verification screen *without* attempting authenticated API
+/// calls (which would fail because the backend rejects unverified tokens).
+enum EmailSignInResult {
+  /// Sign-in succeeded and the email is verified. Profile has been loaded.
+  success,
+
+  /// Firebase sign-in succeeded but the email is not verified yet.
+  /// The user is still signed in to Firebase (so they can resend the
+  /// verification email) but no backend calls have been made.
+  unverified,
+
+  /// Sign-in failed (wrong credentials, network, etc.). Inspect [AuthController.state].
+  failure,
+}
+
 class AuthController extends StateNotifier<AsyncValue<void>> {
   AuthController(this._ref) : super(const AsyncValue.data(null));
 
@@ -38,17 +56,27 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   AuthRepository get _auth => _ref.read(authRepositoryProvider);
   UserRemoteDataSource get _userDs => _ref.read(userRemoteDataSourceProvider);
 
-  Future<bool> signInWithEmail(String email, String password) async {
+  Future<EmailSignInResult> signInWithEmail(String email, String password) async {
     state = const AsyncValue.loading();
     try {
-      await _auth.signInWithEmail(email, password);
+      final credential = await _auth.signInWithEmail(email, password);
+      final firebaseUser = credential.user;
+
+      // For password users, require email verification before touching the
+      // backend. The user remains signed in to Firebase so the verification
+      // screen can resend the email; we just don't fetch the profile.
+      if (firebaseUser != null && !firebaseUser.emailVerified) {
+        state = const AsyncValue.data(null);
+        return EmailSignInResult.unverified;
+      }
+
       final user = await _userDs.getMe();
       _ref.read(currentUserProvider.notifier).state = user;
       state = const AsyncValue.data(null);
-      return true;
+      return EmailSignInResult.success;
     } catch (e, st) {
       state = AsyncValue.error(_mapFirebaseError(e), st);
-      return false;
+      return EmailSignInResult.failure;
     }
   }
 
@@ -138,6 +166,14 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   Future<void> signOut() async {
     _ref.read(currentUserProvider.notifier).state = null;
     await _auth.signOut();
+  }
+
+  /// Called when an unverified user taps "Back to sign in" on the verification
+  /// screen. Performs a full logout (clears in-memory state and Firebase
+  /// session). FCM unregistration is handled by the verify_email_screen before
+  /// invoking this helper.
+  Future<void> backToSignInFromUnverified() async {
+    await signOut();
   }
 
   Future<void> fetchCurrentUser() async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../shared/widgets/app_avatar.dart';
 import '../../../shared/widgets/tag_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/notification_bell_action.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../dashboard/data/models/dashboard_models.dart';
 
@@ -41,9 +44,29 @@ class PeersScreen extends ConsumerStatefulWidget {
 
 class _PeersScreenState extends ConsumerState<PeersScreen> {
   final _controller = TextEditingController();
+  Timer? _debounce;
+  String _lastSearched = '';
+
+  void _onChanged(String value) {
+    // Debounce search-as-you-type by 350ms so we don't fire a network
+    // request on every keystroke. Submit/Search button still triggers
+    // the lookup immediately via _runSearch().
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _runSearch(value);
+    });
+  }
+
+  void _runSearch(String value) {
+    final trimmed = value.trim();
+    if (trimmed == _lastSearched) return;
+    _lastSearched = trimmed;
+    ref.read(_peersSearchProvider.notifier).search(trimmed);
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -53,7 +76,10 @@ class _PeersScreenState extends ConsumerState<PeersScreen> {
     final peersState = ref.watch(_peersSearchProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Find Peers')),
+      appBar: AppBar(
+        title: const Text('Find Peers'),
+        actions: const [NotificationBellAction()],
+      ),
       body: Column(
         children: [
           Padding(
@@ -65,16 +91,30 @@ class _PeersScreenState extends ConsumerState<PeersScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search by name, skills, projects...',
-                        prefixIcon: Icon(Icons.search, size: 20),
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: peersState.isLoading
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primaryStart,
+                                  ),
+                                ),
+                              )
+                            : null,
                       ),
-                      onSubmitted: (v) => ref.read(_peersSearchProvider.notifier).search(v),
+                      onChanged: _onChanged,
+                      onSubmitted: _runSearch,
                     ),
                   ),
                   const SizedBox(width: 12),
                   GradientButton(
-                    onPressed: () => ref.read(_peersSearchProvider.notifier).search(_controller.text),
+                    onPressed: () => _runSearch(_controller.text),
                     label: 'Search',
                     width: 90,
                     height: 44,
@@ -94,10 +134,17 @@ class _PeersScreenState extends ConsumerState<PeersScreen> {
                 if (peers.isEmpty) {
                   return const EmptyState(icon: Icons.search, title: 'Search for peers', subtitle: 'Find developers by name, skills, projects, or apps');
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: peers.length,
-                  itemBuilder: (context, i) => _PeerTile(peer: peers[i]),
+                return RefreshIndicator(
+                  color: AppColors.primaryStart,
+                  onRefresh: () => ref
+                      .read(_peersSearchProvider.notifier)
+                      .search(_controller.text),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: peers.length,
+                    itemBuilder: (context, i) => _PeerTile(peer: peers[i]),
+                  ),
                 );
               },
             ),

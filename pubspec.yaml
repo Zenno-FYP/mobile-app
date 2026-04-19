@@ -32,6 +32,10 @@ dependencies:
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
 
+  # Push notifications
+  firebase_messaging: 16.2.0
+  flutter_local_notifications: ^18.0.1
+
   # Chat realtime
   socket_io_client: ^3.0.2
 

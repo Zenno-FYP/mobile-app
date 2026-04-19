@@ -28,6 +28,41 @@ import '../features/notifications/presentation/notifications_screen.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Subtle fade + tiny scale-up transition for deep-link / detail screens.
+///
+/// We intentionally avoid the default platform slide here so push/pop feels
+/// closer to a native modal-into-detail and lets [Hero] tags blend in.
+/// `MediaQuery.disableAnimationsOf(context)` is honoured so users with
+/// reduced-motion accessibility settings still get an instant transition.
+CustomTransitionPage<T> _fadeScalePage<T>({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionsBuilder: (context, animation, _, page) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        return page;
+      }
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.985, end: 1.0).animate(curved),
+          child: page,
+        ),
+      );
+    },
+  );
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final authRefresh = _GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges());
@@ -54,15 +89,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/auth';
       }
 
-      if (user != null && !user.emailVerified && !isVerifyRoute && !isAuthRoute) {
-        // Allow OAuth users who may not have email verification
-        final isOAuth = user.providerData.any(
-          (p) => p.providerId == 'google.com' || p.providerId == 'github.com',
-        );
-        if (!isOAuth) return '/verify-email';
+      // For password (non-OAuth) users with an unverified email, force them to
+      // the verification screen. This must take precedence over the
+      // "isAuthRoute -> /dashboard" rule below to avoid a one-tick flash of the
+      // dashboard during the redirect chain.
+      final needsVerification = user != null &&
+          !user.emailVerified &&
+          user.providerData.every((p) => p.providerId == 'password');
+
+      if (needsVerification && !isVerifyRoute) {
+        return '/verify-email';
       }
 
-      if (user != null && isAuthRoute) {
+      if (user != null && !needsVerification && isAuthRoute) {
         return '/dashboard';
       }
 
@@ -90,29 +129,36 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analytics/metrics',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const MetricsDetailScreen(),
+        pageBuilder: (context, state) =>
+            _fadeScalePage(state: state, child: const MetricsDetailScreen()),
       ),
       GoRoute(
         path: '/analytics/apps-languages',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const AppsLanguagesScreen(),
+        pageBuilder: (context, state) =>
+            _fadeScalePage(state: state, child: const AppsLanguagesScreen()),
       ),
       GoRoute(
         path: '/analytics/skills-projects',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const SkillsProjectsScreen(),
+        pageBuilder: (context, state) =>
+            _fadeScalePage(state: state, child: const SkillsProjectsScreen()),
       ),
       GoRoute(
         path: '/projects/:projectName',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => ProjectDetailScreen(
-          projectName: state.pathParameters['projectName']!,
+        pageBuilder: (context, state) => _fadeScalePage(
+          state: state,
+          child: ProjectDetailScreen(
+            projectName: state.pathParameters['projectName']!,
+          ),
         ),
       ),
       GoRoute(
         path: '/notifications',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const NotificationsScreen(),
+        pageBuilder: (context, state) =>
+            _fadeScalePage(state: state, child: const NotificationsScreen()),
       ),
 
       // Bottom-nav shell routes
@@ -137,11 +183,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':conversationId',
                 parentNavigatorKey: _rootNavigatorKey,
-                builder: (context, state) => ThreadScreen(
-                  conversationId: state.pathParameters['conversationId']!,
-                  otherUser: state.extra is ConversationUser
-                      ? state.extra as ConversationUser
-                      : null,
+                pageBuilder: (context, state) => _fadeScalePage(
+                  state: state,
+                  child: ThreadScreen(
+                    conversationId: state.pathParameters['conversationId']!,
+                    otherUser: state.extra is ConversationUser
+                        ? state.extra as ConversationUser
+                        : null,
+                  ),
                 ),
               ),
             ],
@@ -155,8 +204,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':userId/profile',
                 parentNavigatorKey: _rootNavigatorKey,
-                builder: (context, state) => PublicProfileScreen(
-                  userId: state.pathParameters['userId']!,
+                pageBuilder: (context, state) => _fadeScalePage(
+                  state: state,
+                  child: PublicProfileScreen(
+                    userId: state.pathParameters['userId']!,
+                  ),
                 ),
               ),
             ],
@@ -170,7 +222,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'edit',
                 parentNavigatorKey: _rootNavigatorKey,
-                builder: (context, state) => const EditProfileScreen(),
+                pageBuilder: (context, state) =>
+                    _fadeScalePage(state: state, child: const EditProfileScreen()),
               ),
             ],
           ),
