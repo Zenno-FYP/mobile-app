@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/error_state.dart';
 import '../../../core/widgets/metric_tile.dart';
@@ -119,7 +120,7 @@ class ProfileScreen extends ConsumerWidget {
                     MetricTile(icon: Icons.local_fire_department, label: 'Streak', value: '${data.streakDays}d',
                         gradient: const LinearGradient(colors: [AppColors.yellow, AppColors.yellowDark])),
                     MetricTile(icon: Icons.folder, label: 'Projects', value: '${data.totalProjects}'),
-                    MetricTile(icon: Icons.timer, label: 'App Hours', value: data.totalAppTimeHours.toStringAsFixed(1),
+                    MetricTile(icon: Icons.timer, label: 'App Hours', value: formatHours(data.totalAppTimeHours),
                         gradient: const LinearGradient(colors: [AppColors.teal, AppColors.tealDark])),
                     MetricTile(icon: Icons.psychology, label: 'Flow Focus',
                         value: data.globalFlowFocusPercent != null ? '${data.globalFlowFocusPercent!.toStringAsFixed(0)}%' : 'N/A',
@@ -331,7 +332,7 @@ class _ProjectTile extends StatelessWidget {
             Wrap(
               spacing: 6, runSpacing: 4,
               children: [
-                TagBadge(label: '${project.appTimeHours.toStringAsFixed(1)}h'),
+                TagBadge(label: formatHours(project.appTimeHours)),
                 ...project.topSkills.take(3).map((s) => TagBadge(label: s.name, isGradient: true)),
               ],
             ),

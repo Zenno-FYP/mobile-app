@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/metric_tile.dart';
 import '../../../core/widgets/shimmer_loader.dart';
@@ -397,9 +398,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   overflow: TextOverflow.ellipsis),
                             ),
                             Text(
-                              app.durationHours < 1
-                                  ? '${(app.durationHours * 60).round()}m'
-                                  : '${app.durationHours.toStringAsFixed(1)}h',
+                              formatHours(app.durationHours),
                               style: TextStyle(fontSize: 13, color: secondaryColor),
                             ),
                             const SizedBox(width: 8),
