@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/app_background.dart';
+import '../features/chat/data/chat_socket_service.dart';
+import '../features/chat/presentation/conversations_screen.dart';
 import '../features/notifications/data/fcm_service.dart';
 import 'router.dart';
 import 'theme/app_colors.dart';
@@ -34,10 +37,19 @@ class _AppShellState extends ConsumerState<AppShell> {
     return 0;
   }
 
+  StreamSubscription<NewMessageEvent>? _chatSub;
+
   @override
   void initState() {
     super.initState();
     _initFcm();
+    _initChatSocket();
+  }
+
+  @override
+  void dispose() {
+    _chatSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _initFcm() async {
@@ -48,6 +60,35 @@ class _AppShellState extends ConsumerState<AppShell> {
       await fcm.requestAndRegister();
     } catch (e) {
       debugPrint('[FCM] Init error: $e');
+    }
+  }
+
+  /// Connect the chat socket as soon as the authenticated shell mounts
+  /// (instead of waiting for the user to open the Chats tab) and listen
+  /// for incoming messages app-wide. When a message arrives while the
+  /// user is not on its thread we just refresh the bell badge / list —
+  /// the per-thread screen still owns its own optimistic append, so
+  /// we don't double-render anything.
+  ///
+  /// This closes the gap where, after a fresh app launch, a peer would
+  /// send a message and *no* notification ever showed up because (a) the
+  /// chat socket wasn't connected yet and (b) the FCM foreground handler
+  /// silently no-op'd on devices that strip the `notification` block.
+  Future<void> _initChatSocket() async {
+    try {
+      final socket = ref.read(chatSocketProvider);
+      _chatSub = socket.onNewMessage.listen((event) {
+        // The thread screen handles its own incoming messages (and marks
+        // them read). For everyone else we just need the bell + list to
+        // reflect the new server-side notification row.
+        final fcm = ref.read(fcmServiceProvider);
+        fcm.refreshNotifProviders();
+      });
+      await socket.connect();
+    } catch (e) {
+      // Connection failures are non-fatal — the per-thread screen will
+      // retry on send, and FCM still delivers pushes independently.
+      debugPrint('[Chat] socket init error: $e');
     }
   }
 

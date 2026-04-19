@@ -4,30 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../core/providers/core_providers.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/shimmer_loader.dart';
 import '../data/fcm_service.dart';
 import '../data/notification_models.dart';
 
-/// Single-page convenience: returns the first page.
-///
-/// We keep this around so that the bell badge / shell can keep using a simple
-/// `FutureProvider` for the `unreadCount` field. The full paginated list is
-/// owned by [NotificationsScreen] state directly so we can append pages
-/// without invalidating + refetching from page 1.
-final notificationsProvider = FutureProvider<
-    ({List<NotificationItem> items, int unreadCount, bool hasMore})>((ref) {
-  ref.watch(userSessionProvider);
-  final repo = ref.watch(notificationRepositoryProvider);
-  return repo.fetchNotifications();
-});
-
-final unreadCountProvider = FutureProvider<int>((ref) {
-  ref.watch(userSessionProvider);
-  final repo = ref.watch(notificationRepositoryProvider);
-  return repo.getUnreadCount();
-});
+// `notificationsProvider` and `unreadCountProvider` are defined in
+// `data/fcm_service.dart` so the FcmService can invalidate them when a
+// push lands (otherwise we'd have a presentation-layer import cycle).
 
 /// Filter chip for the notifications list.
 enum _NotifFilter { all, chat, project, digest }
