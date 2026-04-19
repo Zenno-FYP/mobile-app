@@ -77,11 +77,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         });
       }
     } else {
-      final ok = await controller.signInWithEmail(
+      final result = await controller.signInWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
       );
-      if (ok && mounted) context.go('/dashboard');
+      if (!mounted) return;
+      switch (result) {
+        case EmailSignInResult.success:
+          context.go('/dashboard');
+          break;
+        case EmailSignInResult.unverified:
+          // Route to verify-email screen so the user can resend / wait.
+          // The user remains signed in to Firebase but no backend calls
+          // happen until the email is verified.
+          context.go('/verify-email');
+          break;
+        case EmailSignInResult.failure:
+          // Error already surfaced via authState.error in the form.
+          break;
+      }
     }
   }
 

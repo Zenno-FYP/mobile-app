@@ -10,6 +10,7 @@ import '../../../core/widgets/error_state.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/tag_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/notification_bell_action.dart';
 import '../../settings/presentation/settings_bottom_sheet.dart';
 import '../data/dashboard_repository.dart';
 import '../data/models/dashboard_models.dart';
@@ -65,27 +66,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
-          IconButton(
-            icon: Stack(
-              children: [
-                Icon(Icons.notifications_outlined,
-                    color: isDark ? AppColors.darkText : AppColors.lightText),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            onPressed: () => context.push('/notifications'),
-          ),
+          const NotificationBellAction(),
           IconButton(
             icon: Icon(Icons.settings_outlined,
                 color: isDark ? AppColors.darkText : AppColors.lightText),

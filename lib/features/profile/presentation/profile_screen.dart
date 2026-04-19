@@ -13,6 +13,7 @@ import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/tag_badge.dart';
 import '../../../shared/widgets/lang_bar.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/notification_bell_action.dart';
 import '../../dashboard/data/dashboard_repository.dart';
 import '../../dashboard/data/models/dashboard_models.dart';
 
@@ -33,6 +34,7 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
+          const NotificationBellAction(),
           TextButton.icon(
             onPressed: () => context.push('/profile/edit'),
             icon: const Icon(Icons.edit_outlined, size: 18),
