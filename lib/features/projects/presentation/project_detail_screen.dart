@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/error_state.dart';
@@ -13,6 +14,7 @@ import '../../dashboard/data/dashboard_repository.dart';
 import '../../dashboard/data/models/dashboard_models.dart';
 
 final _projectDetailProvider = FutureProvider.family<ProjectDetailResponse, String>((ref, name) {
+  ref.watch(userSessionProvider);
   return DashboardRepository(ref.watch(apiClientProvider)).getProjectDetail(name);
 });
 

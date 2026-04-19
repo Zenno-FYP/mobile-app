@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../shared/widgets/app_avatar.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/chat_repository.dart';
 import '../data/chat_socket_service.dart';
@@ -215,7 +217,8 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_otherUser?.name ?? 'Chat'),
+        titleSpacing: 0,
+        title: _ChatHeader(user: _otherUser),
       ),
       body: Column(
         children: [
@@ -470,5 +473,70 @@ class _Bubble extends StatelessWidget {
     } catch (_) {
       return '';
     }
+  }
+}
+
+/// AppBar title showing the other participant's avatar and name. Tapping
+/// anywhere on the header opens the same public profile that the Peers tab
+/// uses, keeping the deep-link contract consistent across surfaces.
+class _ChatHeader extends StatelessWidget {
+  const _ChatHeader({required this.user});
+  final ConversationUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final u = user;
+    final hasUser = u != null && u.id.isNotEmpty;
+
+    return InkWell(
+      onTap: hasUser ? () => context.push('/peers/${u.id}/profile') : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppAvatar(
+              imageUrl: u?.profilePhoto,
+              name: u?.name,
+              size: 36,
+              borderWidth: 1.5,
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    u?.name ?? 'Chat',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  if (hasUser)
+                    Text(
+                      'View profile',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -17,11 +17,14 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
-    <!-- Notifications (Android 13+) - currently a placeholder for future push -->
+    <!-- Notifications (Android 13+) — required for FCM push to be visible. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Vibration feedback -->
+    <!-- Vibration feedback (in-app haptics + notification vibration). -->
     <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- Lets the system surface heads-up notifications while the screen is on. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
     <application
         android:label="Zenno"
@@ -29,6 +32,28 @@
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true">
+
+        <!--
+          FCM default notification channel + icon.
+
+          Without these two meta-data entries, Android 8+ routes background
+          and terminated push messages through an auto-generated
+          "Miscellaneous" channel. On many OEMs (Xiaomi, OnePlus, Samsung,
+          Realme) that fallback channel is silent by default, so users see
+          "no ring, no notification" exactly as reported. Pointing FCM at
+          our explicit high-importance channel (created in FcmService) and
+          giving it a real notification icon fixes both delivery and
+          sound/vibration.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="zenno_notifications" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
