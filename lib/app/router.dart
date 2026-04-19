@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers/core_providers.dart';
+import '../core/widgets/app_background.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/auth/presentation/verify_email_screen.dart';
@@ -34,13 +35,22 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 /// closer to a native modal-into-detail and lets [Hero] tags blend in.
 /// `MediaQuery.disableAnimationsOf(context)` is honoured so users with
 /// reduced-motion accessibility settings still get an instant transition.
+///
+/// The child is wrapped in [AppBackground] because every screen using this
+/// helper is pushed at the root navigator level (above the [AppShell]) and
+/// therefore does NOT inherit the shell's gradient/orb background. The app's
+/// theme sets `scaffoldBackgroundColor: Colors.transparent`, so without this
+/// wrapper the screen would appear over the platform window default — which
+/// is solid black in light mode and makes glass cards nearly invisible in
+/// dark mode.
 CustomTransitionPage<T> _fadeScalePage<T>({
   required GoRouterState state,
   required Widget child,
 }) {
+  final wrapped = AppBackground(child: child);
   return CustomTransitionPage<T>(
     key: state.pageKey,
-    child: child,
+    child: wrapped,
     transitionDuration: const Duration(milliseconds: 220),
     reverseTransitionDuration: const Duration(milliseconds: 180),
     transitionsBuilder: (context, animation, _, page) {
