@@ -375,7 +375,7 @@ class _AppUsageChart extends StatelessWidget {
               children: [
                 if (d.totalHours > 0)
                   Text(
-                    '${d.totalHours.toStringAsFixed(1)}',
+                    d.totalHours.toStringAsFixed(1),
                     style: TextStyle(fontSize: 8, color: labelColor),
                   ),
                 const SizedBox(height: 2),

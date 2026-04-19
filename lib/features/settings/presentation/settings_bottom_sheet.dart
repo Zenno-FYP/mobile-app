@@ -189,6 +189,9 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                     label: 'Push notifications',
                     value: _prefs?.pushEnabled ?? false,
                     onChanged: (v) async {
+                      // Capture messenger before any await so we don't use
+                      // BuildContext across an async gap.
+                      final messenger = ScaffoldMessenger.of(context);
                       await _updatePref(
                         {'push_enabled': v},
                         optimistic: _prefs?.copyWith(pushEnabled: v),
@@ -207,7 +210,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                             optimistic: _prefs?.copyWith(pushEnabled: false),
                           );
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             const SnackBar(
                               content: Text(
                                 'Notification permission was denied. Enable it in system settings to receive push notifications.',
@@ -216,7 +219,7 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                           );
                         } else if (result == FcmRegisterResult.error) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             const SnackBar(
                               content: Text(
                                 'Could not enable push notifications. Please try again.',
