@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
-import 'notifications_screen.dart' show unreadCountProvider;
+import '../data/fcm_service.dart' show unreadCountProvider;
 
 /// AppBar action that shows a notification bell with a live unread badge.
 ///
