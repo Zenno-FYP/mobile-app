@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/error_state.dart';
 import '../../../shared/widgets/section_header.dart';
@@ -74,6 +75,57 @@ int _hashString(String s) {
 
 Color _appColor(String name) =>
     _kAppColorPalette[_hashString(name) % _kAppColorPalette.length];
+
+/// Pick a Material icon that loosely matches the running app, mirroring the
+/// website's `getAppIconComponent` so VS Code → code, Chrome → globe, etc.
+IconData _appIcon(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('code') || n.contains('vscode') || n.contains('vs ')) {
+    return Icons.code;
+  }
+  if (n.contains('chrome') ||
+      n.contains('firefox') ||
+      n.contains('edge') ||
+      n.contains('brave') ||
+      n.contains('safari') ||
+      n.contains('opera')) {
+    return Icons.public;
+  }
+  if (n.contains('terminal') ||
+      n.contains('cmd') ||
+      n.contains('powershell') ||
+      n.contains('bash') ||
+      n.contains('iterm')) {
+    return Icons.terminal;
+  }
+  if (n.contains('slack') ||
+      n.contains('discord') ||
+      n.contains('whatsapp') ||
+      n.contains('teams') ||
+      n.contains('telegram') ||
+      n.contains('message')) {
+    return Icons.chat_bubble_outline;
+  }
+  if (n.contains('figma') ||
+      n.contains('sketch') ||
+      n.contains('photoshop') ||
+      n.contains('illustrator')) {
+    return Icons.brush;
+  }
+  if (n.contains('notion') ||
+      n.contains('obsidian') ||
+      n.contains('docs') ||
+      n.contains('word')) {
+    return Icons.description;
+  }
+  if (n.contains('spotify') || n.contains('music')) {
+    return Icons.music_note;
+  }
+  if (n.contains('mail') || n.contains('outlook') || n.contains('gmail')) {
+    return Icons.mail_outline;
+  }
+  return Icons.apps;
+}
 
 Color _categoryColor(String name) =>
     _kCategoryColors[name] ?? _appColor(name);
@@ -245,7 +297,7 @@ class _AppsLanguagesScreenState extends ConsumerState<AppsLanguagesScreen> {
               child: _StatCard(
                 icon: Icons.access_time,
                 label: 'Active time ($shortLabel)',
-                value: '${data.topApps.totalUsageHours.toStringAsFixed(1)}h',
+                value: formatHours(data.topApps.totalUsageHours),
                 sub: '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(0)}% vs ${_priorLabel(_period)}',
                 subColor: pctColor,
                 gradient: const [AppColors.primaryStart, AppColors.primaryEnd],
@@ -368,7 +420,7 @@ class _AppUsageChart extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (d.totalHours > 0)
-                  Text(d.totalHours.toStringAsFixed(1),
+                  Text(formatHours(d.totalHours),
                       style: TextStyle(fontSize: 8, color: labelColor)),
                 const SizedBox(height: 2),
                 Expanded(
@@ -473,7 +525,7 @@ class _CategoryPieState extends State<_CategoryPie> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${cat.category} · ${cat.hours.toStringAsFixed(1)}h',
+                  '${cat.category} · ${formatHours(cat.hours)}',
                   style: TextStyle(
                     fontSize: 11,
                     color: widget.isDark
@@ -585,23 +637,28 @@ class _AppRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Gradient-filled square with a real Material icon — matches the
+        // website's per-app card avatar (was previously an empty solid block
+        // with no glyph, which read as "icon missing").
         Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: isDark ? color.withAlpha(40) : color.withAlpha(28),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(6),
-              ),
+            gradient: LinearGradient(
+              colors: [color, color.withValues(alpha: 0.78)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
+          child: Icon(_appIcon(app.name), color: Colors.white, size: 22),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -623,7 +680,7 @@ class _AppRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${app.durationHours.toStringAsFixed(1)}h',
+                    formatHours(app.durationHours),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

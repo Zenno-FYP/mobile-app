@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/error_state.dart';
@@ -76,7 +77,7 @@ class PublicProfileScreen extends ConsumerWidget {
                   MetricTile(icon: Icons.local_fire_department, label: 'Streak', value: '${data.profile.streakDays}d',
                       gradient: const LinearGradient(colors: [AppColors.yellow, AppColors.yellowDark])),
                   MetricTile(icon: Icons.folder, label: 'Projects', value: '${data.profile.totalProjects}'),
-                  MetricTile(icon: Icons.timer, label: 'App Hours', value: data.profile.totalAppTimeHours.toStringAsFixed(1),
+                  MetricTile(icon: Icons.timer, label: 'App Hours', value: formatHours(data.profile.totalAppTimeHours),
                       gradient: const LinearGradient(colors: [AppColors.teal, AppColors.tealDark])),
                   MetricTile(icon: Icons.psychology, label: 'Flow', value: data.profile.globalFlowFocusPercent != null ? '${data.profile.globalFlowFocusPercent!.toStringAsFixed(0)}%' : 'N/A',
                       gradient: const LinearGradient(colors: [AppColors.pink, AppColors.pinkLight])),
