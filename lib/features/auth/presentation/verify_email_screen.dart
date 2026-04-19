@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +7,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../notifications/data/fcm_service.dart';
 import 'auth_controller.dart';
 
 class VerifyEmailScreen extends ConsumerStatefulWidget {
@@ -20,6 +22,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   bool _checking = false;
 
   Future<void> _resend() async {
+    HapticFeedback.lightImpact();
     setState(() => _sending = true);
     await ref.read(authControllerProvider.notifier).resendVerificationEmail();
     if (mounted) {
@@ -47,7 +50,15 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   }
 
   Future<void> _backToSignIn() async {
-    await ref.read(authControllerProvider.notifier).signOut();
+    // Unregister the active FCM token first so the backend doesn't keep an
+    // orphaned device token tied to this (still-unverified) user. If the
+    // network call fails, fall through to signOut so the user is never stuck.
+    try {
+      await ref.read(fcmServiceProvider).unregister();
+    } catch (_) {}
+    await ref
+        .read(authControllerProvider.notifier)
+        .backToSignInFromUnverified();
     if (mounted) context.go('/auth');
   }
 
@@ -59,13 +70,15 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       child: Scaffold(
         body: SafeArea(
           child: Center(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: GlassCard(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                     Container(
                       width: 64,
                       height: 64,
@@ -120,6 +133,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                       child: const Text('Back to sign in'),
                     ),
                   ],
+                  ),
                 ),
               ),
             ),

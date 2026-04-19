@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../../core/widgets/error_state.dart';
 import '../../../core/widgets/metric_tile.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/notification_bell_action.dart';
 import '../data/agent_repository.dart';
 import '../data/agent_models.dart';
 
@@ -40,6 +42,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
       appBar: AppBar(
         title: const Text('Zenno Agent'),
         actions: [
+          const NotificationBellAction(),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -94,8 +97,59 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                       ),
                     ),
                   ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
+                  loading: () => GlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: const [
+                        SectionHeader(
+                          title: 'Agent Statistics',
+                          icon: Icons.bar_chart,
+                        ),
+                        SizedBox(height: 16),
+                        Center(
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: AppColors.primaryStart,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                  error: (e, _) => GlassCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionHeader(
+                          title: 'Agent Statistics',
+                          icon: Icons.bar_chart,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Could not load agent stats',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkSecondaryText
+                                : AppColors.lightSecondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => ref.invalidate(_statsProvider),
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Retry'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -182,11 +236,24 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
   }
 
   Future<void> _update(Map<String, dynamic> patch, AgentPreferences newPrefs) async {
+    // Light tactile confirmation that the toggle/segmented control was
+    // accepted before the network round-trip starts.
+    HapticFeedback.selectionClick();
+    // Optimistic update: snapshot the previous prefs so we can revert
+    // if the API call fails. The screen already re-renders immediately.
+    final previous = _prefs;
     setState(() => _prefs = newPrefs);
     try {
       await ref.read(_agentRepoProvider).updatePreferences(patch);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _prefs = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save your preference. Reverted.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 }

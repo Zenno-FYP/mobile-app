@@ -9,6 +9,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state.dart';
 import '../../../shared/widgets/app_avatar.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/notification_bell_action.dart';
 import '../data/chat_repository.dart';
 import '../data/models/chat_models.dart';
 import '../data/chat_socket_service.dart';
@@ -45,7 +46,10 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final convs = ref.watch(_conversationsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chats')),
+      appBar: AppBar(
+        title: const Text('Chats'),
+        actions: const [NotificationBellAction()],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.go('/peers'),
         backgroundColor: AppColors.primaryStart,
