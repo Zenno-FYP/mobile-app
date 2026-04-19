@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/metric_tile.dart';
@@ -20,6 +21,7 @@ import 'widgets/developer_trends_chart.dart';
 // Family provider — keyed by period string so toggling triggers a fresh fetch.
 final _metricsProvider =
     FutureProvider.family<PerformanceMetricsResponse, String>((ref, period) {
+  ref.watch(userSessionProvider);
   return ref.watch(_dashboardRepoProvider).getPerformanceMetrics(period: period);
 });
 
@@ -27,15 +29,18 @@ final _dashboardRepoProvider =
     Provider((ref) => DashboardRepository(ref.watch(apiClientProvider)));
 
 final _toolUsageProvider = FutureProvider<ToolUsageResponse>((ref) {
+  ref.watch(userSessionProvider);
   return ref.watch(_dashboardRepoProvider).getToolUsage();
 });
 
 final _allTimeAppsProvider = FutureProvider<List<ProfileGlobalRow>>((ref) async {
+  ref.watch(userSessionProvider);
   final page = await ref.watch(_dashboardRepoProvider).getProfilePage();
   return page.topApps;
 });
 
 final _insightsProvider = FutureProvider<ProjectInsightsResponse>((ref) {
+  ref.watch(userSessionProvider);
   return ref.watch(_dashboardRepoProvider).getProjectInsights();
 });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/error_state.dart';
@@ -139,6 +140,7 @@ String _formatLoc(int n) {
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 final _detailProvider = FutureProvider.family<ToolUsageDetailResponse, String>((ref, period) {
+  ref.watch(userSessionProvider);
   return DashboardRepository(ref.watch(apiClientProvider)).getToolUsageDetail(period: period);
 });
 

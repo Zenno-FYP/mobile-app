@@ -50,11 +50,25 @@ class FcmService {
   String? _currentToken;
   GoRouter? _router;
 
+  /// Channel that *every* push (chat, project, digest) is delivered on.
+  ///
+  /// `Importance.max` (vs `high`) gives a heads-up notification + sound +
+  /// vibration on Android 8+. We also set `playSound`, `enableVibration`
+  /// and `showBadge` explicitly so OEM skins that ship odd defaults
+  /// (Xiaomi, OnePlus, Realme) still ring on the first install.
+  ///
+  /// The channel id is referenced from `AndroidManifest.xml` via
+  /// `com.google.firebase.messaging.default_notification_channel_id`, so
+  /// background / terminated FCM payloads land on the same channel as
+  /// foreground ones — no silent fallback.
   static const _androidChannel = AndroidNotificationChannel(
     'zenno_notifications',
     'Zenno Notifications',
-    description: 'Zenno app notifications',
-    importance: Importance.high,
+    description: 'Chats, project updates, and daily digests from Zenno.',
+    importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
   );
 
   Future<void> init(GoRouter router) async {
@@ -139,20 +153,32 @@ class FcmService {
   }
 
   void _handleForeground(RemoteMessage message) {
+    // Prefer the rendered `notification` payload, but fall back to the
+    // data payload so chat pushes (which always include title/body in
+    // both blocks) still ring even if Firebase strips the notification
+    // block on some Android variants.
     final notification = message.notification;
-    if (notification == null) return;
+    final title = notification?.title ?? message.data['title'] as String?;
+    final body = notification?.body ?? message.data['body'] as String?;
+    if (title == null && body == null) return;
 
     _localNotifs.show(
       message.hashCode,
-      notification.title,
-      notification.body,
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
           _androidChannel.name,
           channelDescription: _androidChannel.description,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          enableVibration: true,
+          ticker: title,
+          icon: '@mipmap/ic_launcher',
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.public,
         ),
       ),
       payload: message.data['type'] ?? '',

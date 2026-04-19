@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/utils/format_duration.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/metric_tile.dart';
@@ -145,6 +146,7 @@ String _breakdownTitle(String period) {
 
 final _detailProvider =
     FutureProvider.family<PerformanceMetricsDetailResponse, String>((ref, period) {
+  ref.watch(userSessionProvider);
   return DashboardRepository(ref.watch(apiClientProvider))
       .getPerformanceMetricsDetail(period: period);
 });

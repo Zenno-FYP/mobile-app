@@ -20,14 +20,33 @@ class ChatSocketService {
   Stream<bool> get onConnectionChanged => _connectionController.stream;
   bool get isConnected => _socket?.connected ?? false;
 
+  /// Single-flight connect: callers may invoke [connect] concurrently (e.g.
+  /// the thread screen calling it right before [sendMessage] while the inbox
+  /// is also wiring it up on its post-frame callback). We share one in-flight
+  /// future so they all wait on the same handshake.
+  Future<void>? _connectFuture;
+
   Future<void> connect() async {
     if (_socket?.connected == true) return;
+    final inFlight = _connectFuture;
+    if (inFlight != null) return inFlight;
+    final fut = _doConnect();
+    _connectFuture = fut;
+    try {
+      await fut;
+    } finally {
+      _connectFuture = null;
+    }
+  }
 
+  Future<void> _doConnect() async {
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-    if (token == null) return;
+    if (token == null) {
+      throw const SocketSendException('Not signed in.');
+    }
 
     _socket?.dispose();
-    _socket = io.io(
+    final socket = io.io(
       '${EnvConfig.socketOrigin}/chat',
       io.OptionBuilder()
           .setTransports(['websocket'])
@@ -38,8 +57,11 @@ class ChatSocketService {
           .disableAutoConnect()
           .build(),
     );
+    _socket = socket;
 
-    _socket!
+    // Persistent listeners (kept for the lifetime of the socket so we
+    // continue to forward state changes on every reconnect).
+    socket
       ..onConnect((_) {
         developer.log('chat socket: connected');
         _connectionController.add(true);
@@ -52,7 +74,47 @@ class ChatSocketService {
       ..onError((e) => developer.log('chat socket: error', error: e))
       ..on('chat:new_message', _handleNewMessage);
 
-    _socket!.connect();
+    // One-shot listeners that resolve the handshake future. We use named
+    // closures + manual `off` instead of `once` so we can also cancel them
+    // from the timeout branch below without interfering with the persistent
+    // listeners above.
+    final completer = Completer<void>();
+    Timer? timeout;
+    late void Function(dynamic) onConnectOnce;
+    late void Function(dynamic) onErrorOnce;
+
+    onConnectOnce = (_) {
+      socket.off('connect', onConnectOnce);
+      socket.off('connect_error', onErrorOnce);
+      timeout?.cancel();
+      if (!completer.isCompleted) completer.complete();
+    };
+    onErrorOnce = (dynamic e) {
+      socket.off('connect', onConnectOnce);
+      socket.off('connect_error', onErrorOnce);
+      timeout?.cancel();
+      if (!completer.isCompleted) {
+        completer.completeError(
+          SocketSendException('Cannot reach chat server: $e'),
+        );
+      }
+    };
+
+    socket.on('connect', onConnectOnce);
+    socket.on('connect_error', onErrorOnce);
+
+    timeout = Timer(const Duration(seconds: 8), () {
+      socket.off('connect', onConnectOnce);
+      socket.off('connect_error', onErrorOnce);
+      if (!completer.isCompleted) {
+        completer.completeError(
+          const SocketSendException('Chat server connect timed out.'),
+        );
+      }
+    });
+
+    socket.connect();
+    return completer.future;
   }
 
   void _handleNewMessage(dynamic data) {
@@ -75,7 +137,21 @@ class ChatSocketService {
   Future<ChatMessage> sendMessage({
     required String recipientUserId,
     required String text,
-  }) {
+  }) async {
+    // If we lost the socket (cold start, backgrounded, token refresh), try
+    // to reconnect once before failing. This keeps the UX smooth: the user
+    // taps send, we transparently re-handshake, then deliver the message.
+    if (_socket == null || _socket?.connected != true) {
+      try {
+        await connect();
+      } catch (e) {
+        return Future.error(
+          e is SocketSendException
+              ? e
+              : SocketSendException('Not connected to chat server: $e'),
+        );
+      }
+    }
     final socket = _socket;
     if (socket == null || !socket.connected) {
       return Future.error(

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tint applied to small notification icons in the status bar / shade.
+      Mirrors the brand purple used in the rest of the app
+      (AppColors.primaryStart = 0xFF7C4DFF). Referenced from
+      AndroidManifest.xml via
+      `com.google.firebase.messaging.default_notification_color`.
+    -->
+    <color name="notification_color">#7C4DFF</color>
+</resources>

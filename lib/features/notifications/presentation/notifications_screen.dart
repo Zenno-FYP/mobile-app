@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/shimmer_loader.dart';
 import '../data/fcm_service.dart';
@@ -17,11 +18,13 @@ import '../data/notification_models.dart';
 /// without invalidating + refetching from page 1.
 final notificationsProvider = FutureProvider<
     ({List<NotificationItem> items, int unreadCount, bool hasMore})>((ref) {
+  ref.watch(userSessionProvider);
   final repo = ref.watch(notificationRepositoryProvider);
   return repo.fetchNotifications();
 });
 
 final unreadCountProvider = FutureProvider<int>((ref) {
+  ref.watch(userSessionProvider);
   final repo = ref.watch(notificationRepositoryProvider);
   return repo.getUnreadCount();
 });
