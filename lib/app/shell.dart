@@ -58,9 +58,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       final router = ref.read(routerProvider);
       await fcm.init(router);
       await fcm.requestAndRegister();
-    } catch (e) {
-      debugPrint('[FCM] Init error: $e');
-    }
+    } catch (_) {}
   }
 
   /// Connect the chat socket as soon as the authenticated shell mounts
@@ -85,10 +83,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         fcm.refreshNotifProviders();
       });
       await socket.connect();
-    } catch (e) {
-      // Connection failures are non-fatal — the per-thread screen will
-      // retry on send, and FCM still delivers pushes independently.
-      debugPrint('[Chat] socket init error: $e');
+    } catch (_) {
+      // Non-fatal: per-thread screen retries on send; FCM still delivers.
     }
   }
 

@@ -350,6 +350,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case 'daily_digest':
         context.go('/dashboard');
         break;
+      case 'test':
+        // Already on notifications; no deep link — dismiss snackbar path unused.
+        break;
       default:
         // Unknown notification type — stay on this screen rather than throwing
         // the user to an unrelated route. Surfacing a snackbar keeps things
@@ -428,6 +431,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.create_new_folder;
       case 'daily_digest':
         return Icons.bar_chart;
+      case 'test':
+        return Icons.notifications_active_outlined;
       default:
         return Icons.notifications;
     }
@@ -441,6 +446,8 @@ class _NotificationTile extends StatelessWidget {
         return [AppColors.teal, AppColors.tealDark];
       case 'daily_digest':
         return [AppColors.primaryStart, AppColors.primaryEnd];
+      case 'test':
+        return [AppColors.teal, AppColors.tealDark];
       default:
         return [AppColors.primaryStart, AppColors.primaryEnd];
     }

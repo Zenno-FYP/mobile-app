@@ -68,57 +68,6 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
     }
   }
 
-  bool _sendingTestPush = false;
-
-  /// Fire a real FCM push to every device the current user has
-  /// registered. Useful for QA-ing the push pipeline end-to-end without
-  /// having to wait on a peer to send a chat message. The backend also
-  /// drops a row into the in-app notifications list, so success is
-  /// visible in two places.
-  Future<void> _sendTestPush() async {
-    if (_sendingTestPush) return;
-    HapticFeedback.lightImpact();
-    setState(() => _sendingTestPush = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final repo = ref.read(notificationRepositoryProvider);
-      final result = await repo.sendTestNotification();
-      if (!mounted) return;
-      // Refresh the in-app list/badge immediately so the test row shows
-      // up the next time the user opens the bell — without this we'd
-      // wait on FCM round-trip even though the row is already in Mongo.
-      ref.read(fcmServiceProvider).refreshNotifProviders();
-
-      if (result.pushed) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Test push sent to ${result.successCount} of ${result.deviceCount} device${result.deviceCount == 1 ? '' : 's'}.',
-            ),
-          ),
-        );
-      } else {
-        final reason = switch (result.reason) {
-          'push_disabled' =>
-            'Push notifications are turned off for your account. Toggle "Push notifications" above and try again.',
-          'no_devices' =>
-            'No devices are registered for push. Toggle "Push notifications" above to register this device.',
-          'fcm_failed' =>
-            'Firebase rejected the push. Check your network and try again.',
-          _ => 'Could not send the test push. Try again in a moment.',
-        };
-        messenger.showSnackBar(SnackBar(content: Text(reason)));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not send test push: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _sendingTestPush = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -307,11 +256,6 @@ class _SettingsSheetState extends ConsumerState<_SettingsSheet> {
                       optimistic: _prefs?.copyWith(newProjectEnabled: v),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _SendTestPushButton(
-                    isDark: Theme.of(context).brightness == Brightness.dark,
-                    onPressed: _sendTestPush,
-                  ),
                 ],
               ],
             ),
@@ -446,56 +390,6 @@ class _ToggleRow extends StatelessWidget {
           ),
           Switch(value: value, onChanged: onChanged),
         ],
-      ),
-    );
-  }
-}
-
-class _SendTestPushButton extends StatefulWidget {
-  const _SendTestPushButton({required this.isDark, required this.onPressed});
-  final bool isDark;
-  final Future<void> Function() onPressed;
-
-  @override
-  State<_SendTestPushButton> createState() => _SendTestPushButtonState();
-}
-
-class _SendTestPushButtonState extends State<_SendTestPushButton> {
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: _busy
-            ? null
-            : () async {
-                setState(() => _busy = true);
-                try {
-                  await widget.onPressed();
-                } finally {
-                  if (mounted) setState(() => _busy = false);
-                }
-              },
-        icon: _busy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.notifications_active_outlined, size: 18),
-        label: Text(_busy ? 'Sending…' : 'Send a test notification'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primaryStart,
-          side: BorderSide(
-            color: AppColors.primaryStart.withValues(alpha: 0.5),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
       ),
     );
   }

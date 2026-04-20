@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,6 +75,7 @@ class FcmService {
 
   String? _currentToken;
   GoRouter? _router;
+  bool _tokenRefreshAttached = false;
 
   /// Channel that *every* push (chat, project, digest) is delivered on.
   ///
@@ -123,7 +123,30 @@ class FcmService {
 
     // Terminated tap (app was killed)
     final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) _handleTap(initial);
+    if (initial != null) {
+      _handleTap(initial);
+    }
+
+    _ensureTokenRefreshListener();
+  }
+
+  /// Firebase may rotate the token; register once so we do not stack listeners
+  /// when [requestAndRegister] runs multiple times.
+  void _ensureTokenRefreshListener() {
+    if (_tokenRefreshAttached) return;
+    _tokenRefreshAttached = true;
+    FirebaseMessaging.instance.onTokenRefresh.listen(
+      (newToken) async {
+        if (newToken == _currentToken) return;
+        try {
+          if (_currentToken != null) {
+            await _repo.unregisterToken(_currentToken!).catchError((_) {});
+          }
+          await _repo.registerToken(newToken);
+          _currentToken = newToken;
+        } catch (_) {}
+      },
+    );
   }
 
   /// Result of [requestAndRegister].
@@ -146,28 +169,24 @@ class FcmService {
           break;
       }
 
+      _ensureTokenRefreshListener();
+
       final token = await FirebaseMessaging.instance.getToken();
-      if (token != null && token != _currentToken) {
-        if (_currentToken != null) {
-          await _repo.unregisterToken(_currentToken!).catchError((_) {});
-        }
-        await _repo.registerToken(token);
-        _currentToken = token;
+      if (token == null) {
+        return FcmRegisterResult.error;
+      }
+      if (token == _currentToken) {
+        return FcmRegisterResult.registered;
       }
 
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        if (newToken != _currentToken) {
-          if (_currentToken != null) {
-            await _repo.unregisterToken(_currentToken!).catchError((_) {});
-          }
-          await _repo.registerToken(newToken);
-          _currentToken = newToken;
-        }
-      });
+      if (_currentToken != null) {
+        await _repo.unregisterToken(_currentToken!).catchError((_) {});
+      }
+      await _repo.registerToken(token);
+      _currentToken = token;
 
       return FcmRegisterResult.registered;
-    } catch (e) {
-      debugPrint('[FCM] requestAndRegister failed: $e');
+    } catch (_) {
       return FcmRegisterResult.error;
     }
   }
@@ -249,6 +268,9 @@ class FcmService {
       case 'daily_digest':
         _router!.go('/dashboard');
         break;
+      case 'test':
+        _router!.push('/notifications');
+        break;
       default:
         _router!.push('/notifications');
     }
@@ -269,11 +291,10 @@ class FcmService {
     try {
       _ref.invalidate(notificationsProvider);
       _ref.invalidate(unreadCountProvider);
-    } catch (e) {
+    } catch (_) {
       // Defensive: if the container is mid-disposal (logout race) just
       // skip the bump — the next user-session epoch invalidation will
       // recover anyway.
-      debugPrint('[FCM] notif provider refresh skipped: $e');
     }
   }
 
@@ -288,6 +309,9 @@ class FcmService {
       case 'new_project':
       case 'daily_digest':
         _router!.go('/dashboard');
+        break;
+      case 'test':
+        _router!.push('/notifications');
         break;
       default:
         _router!.push('/notifications');
