@@ -4,30 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../core/providers/core_providers.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/shimmer_loader.dart';
 import '../data/fcm_service.dart';
 import '../data/notification_models.dart';
 
-/// Single-page convenience: returns the first page.
-///
-/// We keep this around so that the bell badge / shell can keep using a simple
-/// `FutureProvider` for the `unreadCount` field. The full paginated list is
-/// owned by [NotificationsScreen] state directly so we can append pages
-/// without invalidating + refetching from page 1.
-final notificationsProvider = FutureProvider<
-    ({List<NotificationItem> items, int unreadCount, bool hasMore})>((ref) {
-  ref.watch(userSessionProvider);
-  final repo = ref.watch(notificationRepositoryProvider);
-  return repo.fetchNotifications();
-});
-
-final unreadCountProvider = FutureProvider<int>((ref) {
-  ref.watch(userSessionProvider);
-  final repo = ref.watch(notificationRepositoryProvider);
-  return repo.getUnreadCount();
-});
+// `notificationsProvider` and `unreadCountProvider` are defined in
+// `data/fcm_service.dart` so the FcmService can invalidate them when a
+// push lands (otherwise we'd have a presentation-layer import cycle).
 
 /// Filter chip for the notifications list.
 enum _NotifFilter { all, chat, project, digest }
@@ -366,6 +350,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case 'daily_digest':
         context.go('/dashboard');
         break;
+      case 'test':
+        // Already on notifications; no deep link — dismiss snackbar path unused.
+        break;
       default:
         // Unknown notification type — stay on this screen rather than throwing
         // the user to an unrelated route. Surfacing a snackbar keeps things
@@ -444,6 +431,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.create_new_folder;
       case 'daily_digest':
         return Icons.bar_chart;
+      case 'test':
+        return Icons.notifications_active_outlined;
       default:
         return Icons.notifications;
     }
@@ -457,6 +446,8 @@ class _NotificationTile extends StatelessWidget {
         return [AppColors.teal, AppColors.tealDark];
       case 'daily_digest':
         return [AppColors.primaryStart, AppColors.primaryEnd];
+      case 'test':
+        return [AppColors.teal, AppColors.tealDark];
       default:
         return [AppColors.primaryStart, AppColors.primaryEnd];
     }

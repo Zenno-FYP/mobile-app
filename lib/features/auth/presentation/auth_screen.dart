@@ -128,7 +128,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
@@ -138,7 +137,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.bolt, color: Colors.white, size: 30),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset('assets/logo.png', fit: BoxFit.cover),
                   ),
 
                   const SizedBox(height: 8),

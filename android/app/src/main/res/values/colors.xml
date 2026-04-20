@@ -8,4 +8,5 @@
       `com.google.firebase.messaging.default_notification_color`.
     -->
     <color name="notification_color">#7C4DFF</color>
+	<color name="ic_launcher_background">#FF7957F8</color>
 </resources>

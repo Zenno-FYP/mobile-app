@@ -58,6 +58,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
   build_runner: ^2.4.15
   freezed: ^3.0.0
   json_serializable: ^6.9.5
@@ -69,3 +70,15 @@ flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/logo.png
+    - assets/appicon-legacy.jpg
+    - assets/appicon-adaptive.png
+    
+
+
+flutter_launcher_icons:
+  android: true   
+  ios: false
+  adaptive_icon_background: "#FF7957F8"
+  adaptive_icon_foreground: assets/appicon-adaptive.png
+  image_path: assets/appicon-legacy.jpg
