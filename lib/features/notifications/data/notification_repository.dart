@@ -62,33 +62,4 @@ class NotificationRepository {
   Future<void> unregisterToken(String token) async {
     await _api.delete('/notifications/devices/$token');
   }
-
-  /// Trigger a real FCM push to every device registered for the
-  /// authenticated user. Result includes `pushed`, `deviceCount`,
-  /// `successCount`, and an optional `reason` (`push_disabled` /
-  /// `no_devices` / `fcm_failed`) so the caller can surface a
-  /// targeted message instead of a generic error.
-  Future<TestNotificationResult> sendTestNotification() async {
-    final data = await _api.post('/notifications/test');
-    final body = (data['data'] as Map?)?.cast<String, dynamic>() ?? const {};
-    return TestNotificationResult(
-      pushed: (body['pushed'] as bool?) ?? false,
-      deviceCount: (body['deviceCount'] as int?) ?? 0,
-      successCount: (body['successCount'] as int?) ?? 0,
-      reason: body['reason'] as String?,
-    );
-  }
-}
-
-class TestNotificationResult {
-  const TestNotificationResult({
-    required this.pushed,
-    required this.deviceCount,
-    required this.successCount,
-    this.reason,
-  });
-  final bool pushed;
-  final int deviceCount;
-  final int successCount;
-  final String? reason;
 }

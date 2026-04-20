@@ -11,9 +11,8 @@ import 'core/providers/core_providers.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage _) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  debugPrint('[FCM] Background message: ${message.messageId}');
 }
 
 Future<void> main() async {
