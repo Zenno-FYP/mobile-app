@@ -124,10 +124,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.bolt, color: Colors.white, size: 24),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset('assets/logo.png', fit: BoxFit.cover),
                   ),
                 ],
               ),
