@@ -28,6 +28,13 @@ class ChatRepository {
     await _client.post('/chat/conversations/$conversationId/read');
   }
 
+  /// Submits a moderation report for this conversation (same contract as the website).
+  Future<void> reportConversation(String conversationId, {String? reason}) async {
+    final t = reason?.trim();
+    final data = (t == null || t.isEmpty) ? <String, dynamic>{} : <String, dynamic>{'reason': t};
+    await _client.post('/chat/conversations/$conversationId/report', data: data);
+  }
+
   /// Fetches the conversation summary for a single conversation by reusing the
   /// inbox endpoint. The chat REST API does not currently expose a single-
   /// conversation lookup, but the inbox is small and lets us recover the
