@@ -246,7 +246,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               : AppColors.lightSecondaryText),
                     ),
                     const SizedBox(height: 12),
-                    ...data.currentProjects.take(5).map((p) => Padding(
+                    ...data.currentProjects.take(4).map((p) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: GestureDetector(
                             onTap: () => context

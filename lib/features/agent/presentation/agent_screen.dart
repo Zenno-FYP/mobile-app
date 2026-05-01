@@ -25,6 +25,15 @@ final _statsProvider = FutureProvider<NudgeStats>((ref) {
   return ref.watch(_agentRepoProvider).getNudgeStats();
 });
 
+const _desktopSyncMaxAge = Duration(minutes: 30);
+
+bool desktopAgentSyncedRecently(String? iso) {
+  if (iso == null || iso.isEmpty) return false;
+  final t = DateTime.tryParse(iso);
+  if (t == null) return false;
+  return DateTime.now().difference(t) <= _desktopSyncMaxAge;
+}
+
 class AgentScreen extends ConsumerStatefulWidget {
   const AgentScreen({super.key});
 
@@ -68,6 +77,10 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     final prefs = _prefs ?? prefsAsync.valueOrNull;
 
     final isRefreshing = prefsAsync.isLoading || statsAsync.isLoading;
+    final user = ref.watch(currentUserProvider);
+    final syncFresh = desktopAgentSyncedRecently(user?.activitySyncAt);
+    final showAgentControls = isRefreshing || syncFresh;
+    final showOfflineBanner = !isRefreshing && !syncFresh;
 
     return Scaffold(
       appBar: AppBar(
@@ -115,125 +128,128 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   _StatsCard(stats: statsAsync, isDark: isDark, ref: ref),
-                  const SizedBox(height: 16),
-
-                  GlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SectionHeader(title: 'Controls', icon: Icons.tune),
-                        const SizedBox(height: 12),
-                        _SwitchRow(
-                          icon: Icons.power_settings_new,
-                          label: 'Nudges Enabled',
-                          subtitle: prefs.nudgeEnabled
-                              ? 'Agent is running'
-                              : 'All nudges are off',
-                          value: prefs.nudgeEnabled,
-                          isDark: isDark,
-                          danger: !prefs.nudgeEnabled,
-                          onChanged: (v) => _update(
-                            {'nudge_enabled': v},
-                            prefs.copyWith(nudgeEnabled: v),
+                  if (showOfflineBanner) ...[
+                    const SizedBox(height: 16),
+                    _DesktopOfflineBanner(isDark: isDark),
+                  ],
+                  if (showAgentControls) ...[
+                    const SizedBox(height: 16),
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SectionHeader(title: 'Controls', icon: Icons.tune),
+                          const SizedBox(height: 12),
+                          _SwitchRow(
+                            icon: Icons.power_settings_new,
+                            label: 'Nudges Enabled',
+                            subtitle: prefs.nudgeEnabled
+                                ? 'Agent is running'
+                                : 'All nudges are off',
+                            value: prefs.nudgeEnabled,
+                            isDark: isDark,
+                            danger: !prefs.nudgeEnabled,
+                            onChanged: (v) => _update(
+                              {'nudge_enabled': v},
+                              prefs.copyWith(nudgeEnabled: v),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        _SwitchRow(
-                          icon: Icons.volume_up,
-                          label: 'Notification Sound',
-                          subtitle: prefs.notificationSound
-                              ? 'Chime plays with each nudge'
-                              : 'Silent notifications',
-                          value: prefs.notificationSound,
-                          isDark: isDark,
-                          onChanged: (v) => _update(
-                            {'notification_sound': v},
-                            prefs.copyWith(notificationSound: v),
+                          const SizedBox(height: 8),
+                          _SwitchRow(
+                            icon: Icons.volume_up,
+                            label: 'Notification Sound',
+                            subtitle: prefs.notificationSound
+                                ? 'Chime plays with each nudge'
+                                : 'Silent notifications',
+                            value: prefs.notificationSound,
+                            isDark: isDark,
+                            onChanged: (v) => _update(
+                              {'notification_sound': v},
+                              prefs.copyWith(notificationSound: v),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _OptionSection(
-                    title: 'Work Schedule',
-                    icon: Icons.schedule,
-                    options: const {
-                      'morning': 'Morning Bird',
-                      'standard': 'Standard Day',
-                      'evening': 'Evening Shift',
-                      'night_owl': 'Night Owl',
-                    },
-                    selected: prefs.workSchedule,
-                    onSelected: (v) => _update(
-                      {'work_schedule': v},
-                      prefs.copyWith(workSchedule: v),
+                    const SizedBox(height: 16),
+                    _OptionSection(
+                      title: 'Work Schedule',
+                      icon: Icons.schedule,
+                      options: const {
+                        'morning': 'Morning Bird',
+                        'standard': 'Standard Day',
+                        'evening': 'Evening Shift',
+                        'night_owl': 'Night Owl',
+                      },
+                      selected: prefs.workSchedule,
+                      onSelected: (v) => _update(
+                        {'work_schedule': v},
+                        prefs.copyWith(workSchedule: v),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _OptionSection(
-                    title: 'Focus Style',
-                    icon: Icons.center_focus_strong,
-                    options: const {
-                      'deep': 'Deep Focus',
-                      'moderate': 'Moderate',
-                      'pomodoro': 'Pomodoro',
-                    },
-                    selected: prefs.focusStyle,
-                    onSelected: (v) => _update(
-                      {'focus_style': v},
-                      prefs.copyWith(focusStyle: v),
+                    const SizedBox(height: 16),
+                    _OptionSection(
+                      title: 'Focus Style',
+                      icon: Icons.center_focus_strong,
+                      options: const {
+                        'deep': 'Deep Focus',
+                        'moderate': 'Moderate',
+                        'pomodoro': 'Pomodoro',
+                      },
+                      selected: prefs.focusStyle,
+                      onSelected: (v) => _update(
+                        {'focus_style': v},
+                        prefs.copyWith(focusStyle: v),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _OptionSection(
-                    title: 'Wellbeing Goal',
-                    icon: Icons.favorite,
-                    options: const {
-                      'focused': 'Stay Focused',
-                      'burnout': 'Prevent Burnout',
-                      'habits': 'Build Habits',
-                      'minimal': 'Minimal Mode',
-                    },
-                    selected: prefs.wellbeingGoal,
-                    onSelected: (v) => _update(
-                      {'wellbeing_goal': v},
-                      prefs.copyWith(wellbeingGoal: v),
+                    const SizedBox(height: 16),
+                    _OptionSection(
+                      title: 'Wellbeing Goal',
+                      icon: Icons.favorite,
+                      options: const {
+                        'focused': 'Stay Focused',
+                        'burnout': 'Prevent Burnout',
+                        'habits': 'Build Habits',
+                        'minimal': 'Minimal Mode',
+                      },
+                      selected: prefs.wellbeingGoal,
+                      onSelected: (v) => _update(
+                        {'wellbeing_goal': v},
+                        prefs.copyWith(wellbeingGoal: v),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _OptionSection(
-                    title: 'Agent Personality',
-                    icon: Icons.record_voice_over,
-                    options: const {
-                      'friendly': 'Friendly',
-                      'motivational': 'Motivational',
-                      'professional': 'Professional',
-                      'casual': 'Casual',
-                    },
-                    selected: prefs.agentTone,
-                    onSelected: (v) => _update(
-                      {'agent_tone': v},
-                      prefs.copyWith(agentTone: v),
+                    const SizedBox(height: 16),
+                    _OptionSection(
+                      title: 'Agent Personality',
+                      icon: Icons.record_voice_over,
+                      options: const {
+                        'friendly': 'Friendly',
+                        'motivational': 'Motivational',
+                        'professional': 'Professional',
+                        'casual': 'Casual',
+                      },
+                      selected: prefs.agentTone,
+                      onSelected: (v) => _update(
+                        {'agent_tone': v},
+                        prefs.copyWith(agentTone: v),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
     );
   }
 
-  void _refresh() {
+  Future<void> _refresh() async {
     ref.invalidate(_prefsProvider);
     ref.invalidate(_statsProvider);
+    try {
+      final u = await ref.read(userRemoteDataSourceProvider).getMe();
+      ref.read(currentUserProvider.notifier).state = u;
+    } catch (_) {
+      // Keep cached user; sync timestamp may be stale until next successful refresh.
+    }
   }
 
   Future<void> _update(
@@ -260,6 +276,47 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
         ),
       );
     }
+  }
+}
+
+class _DesktopOfflineBanner extends StatelessWidget {
+  const _DesktopOfflineBanner({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = isDark ? const Color(0x59FFC107) : const Color(0xFFFFE082);
+    final bg = isDark ? const Color(0x33FFC107) : const Color(0xFFFFF8E1);
+    final titleColor = isDark ? const Color(0xFFFFECB3) : const Color(0xFFBF360C);
+    final bodyColor = isDark ? const Color(0xE6FFE082) : const Color(0xFF5D4037);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Desktop agent is not running',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: titleColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Start the Zenno desktop agent on your computer so it can sync at least once every 30 minutes. Until then, only statistics are shown.',
+            style: TextStyle(fontSize: 13, height: 1.35, color: bodyColor),
+          ),
+        ],
+      ),
+    );
   }
 }
 
