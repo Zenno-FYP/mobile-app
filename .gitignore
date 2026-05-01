@@ -49,3 +49,8 @@ app.*.map.json
 .env.local
 .env.production
 !.env.example
+
+# Firebase local config (regenerate locally via FlutterFire CLI)
+firebase.json
+android/app/google-services.json
+lib/firebase_options.dart
