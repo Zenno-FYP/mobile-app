@@ -40,6 +40,7 @@ The app consumes Zenno backend APIs and uses Firebase for authentication/messagi
 - conversation and thread screens
 - Socket.IO-based real-time updates
 - Firebase Cloud Messaging + local notification presentation
+- users can **report** a conversation for moderation; **reviewing reports** is done in the **Zenno website admin console** (`/admin/chat-reports`) by accounts with `isAdmin` in the backend (not in the mobile app UI)
 
 ### Agent and Settings
 
@@ -165,4 +166,4 @@ flutter build apk --release `
 
 ---
 
-Last Updated: 2026-04-23
+Last Updated: 2026-05-01

@@ -10,6 +10,7 @@ class UserModel {
     this.linkedinUrl,
     this.twitterUrl,
     this.profilePreferences,
+    this.activitySyncAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -24,6 +25,8 @@ class UserModel {
   final String? linkedinUrl;
   final String? twitterUrl;
   final ProfilePreferences? profilePreferences;
+  /// ISO timestamp of last desktop activity sync (`activity_sync_at` from API).
+  final String? activitySyncAt;
   final String? createdAt;
   final String? updatedAt;
 
@@ -41,6 +44,7 @@ class UserModel {
       profilePreferences: json['profile_preferences'] != null
           ? ProfilePreferences.fromJson(json['profile_preferences'] as Map<String, dynamic>)
           : null,
+      activitySyncAt: json['activity_sync_at'] as String?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
     );
@@ -64,6 +68,7 @@ class UserModel {
     String? linkedinUrl,
     String? twitterUrl,
     ProfilePreferences? profilePreferences,
+    String? activitySyncAt,
   }) {
     return UserModel(
       id: id,
@@ -76,6 +81,7 @@ class UserModel {
       linkedinUrl: linkedinUrl ?? this.linkedinUrl,
       twitterUrl: twitterUrl ?? this.twitterUrl,
       profilePreferences: profilePreferences ?? this.profilePreferences,
+      activitySyncAt: activitySyncAt ?? this.activitySyncAt,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
