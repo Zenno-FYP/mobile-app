@@ -162,3 +162,7 @@ flutter build apk --release `
 - **Auth/Firebase errors**: verify Firebase project config and Android app setup.
 - **Push not received**: confirm notification permission, token registration, and backend notification endpoints.
 - **Socket chat issues**: verify backend socket namespace and `socketOrigin` resolution.
+
+---
+
+Last Updated: 2026-04-23

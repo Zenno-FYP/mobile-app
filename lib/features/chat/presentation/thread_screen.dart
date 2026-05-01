@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../shared/widgets/app_avatar.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -201,6 +202,59 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<void> _onReportConversation() async {
+    final controller = TextEditingController();
+    final submit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Report conversation'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: 'Reason (optional)',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            maxLength: 500,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+    final reason = controller.text;
+    controller.dispose();
+    if (submit != true || !mounted) return;
+
+    try {
+      await ChatRepository(ref.read(apiClientProvider)).reportConversation(
+        widget.conversationId,
+        reason: reason,
+      );
+      if (!mounted) return;
+      _showSnack('Report submitted. Thank you.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.isConflict) {
+        _showSnack('You already have an open report for this conversation.');
+      } else {
+        _showSnack(e.message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Could not submit report: $e');
+    }
+  }
+
   @override
   void dispose() {
     _socketSub?.cancel();
@@ -219,6 +273,13 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         title: _ChatHeader(user: _otherUser),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.outlined_flag),
+            tooltip: 'Report conversation',
+            onPressed: () => unawaited(_onReportConversation()),
+          ),
+        ],
       ),
       body: Column(
         children: [
