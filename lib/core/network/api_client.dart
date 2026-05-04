@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../config/env_config.dart';
@@ -19,7 +20,7 @@ class ApiClient {
           ),
         ) {
     _dio.interceptors.add(AuthInterceptor(dio: _dio, onForceLogout: onForceLogout));
-    if (EnvConfig.isDev) {
+    if (kDebugMode) {
       _dio.interceptors.add(PrettyDioLogger(
         requestHeader: false,
         requestBody: true,
