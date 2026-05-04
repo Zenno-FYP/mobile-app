@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import '../../../core/network/api_client.dart';
 import 'notification_models.dart';
 
@@ -52,10 +54,22 @@ class NotificationRepository {
   }
 
   Future<void> registerToken(String token) async {
+    final String platform;
+    final String deviceLabel;
+    if (Platform.isIOS) {
+      platform = 'ios';
+      deviceLabel = 'iOS';
+    } else if (Platform.isAndroid) {
+      platform = 'android';
+      deviceLabel = 'Android';
+    } else {
+      platform = 'android';
+      deviceLabel = 'Mobile';
+    }
     await _api.post('/notifications/devices', data: {
       'token': token,
-      'platform': 'android',
-      'device_label': 'Android Device',
+      'platform': platform,
+      'device_label': deviceLabel,
     });
   }
 

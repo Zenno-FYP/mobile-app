@@ -347,7 +347,7 @@ class _MetricStrip extends StatelessWidget {
         padding: EdgeInsets.zero,
         physics: const BouncingScrollPhysics(),
         itemCount: cards.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (_, i) => cards[i],
       ),
     );
