@@ -164,7 +164,7 @@ class _ConversationTile extends StatelessWidget {
 
   String _formatTime(String iso) {
     try {
-      final dt = DateTime.parse(iso);
+      final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
       if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
         return DateFormat.Hm().format(dt);
