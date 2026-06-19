@@ -363,8 +363,8 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
 
   bool _shouldShowTimestamp(String prevIso, String currentIso) {
     try {
-      final prev = DateTime.parse(prevIso);
-      final cur = DateTime.parse(currentIso);
+      final prev = DateTime.parse(prevIso).toLocal();
+      final cur = DateTime.parse(currentIso).toLocal();
       return cur.difference(prev).inMinutes > 30 || prev.day != cur.day;
     } catch (_) {
       return false;
@@ -373,7 +373,7 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
 
   String _formatDay(String iso) {
     try {
-      final dt = DateTime.parse(iso);
+      final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
       if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
         return 'Today, ${DateFormat.Hm().format(dt)}';
@@ -530,7 +530,7 @@ class _Bubble extends StatelessWidget {
 
   String _formatTime(String iso) {
     try {
-      return DateFormat.Hm().format(DateTime.parse(iso));
+      return DateFormat.Hm().format(DateTime.parse(iso).toLocal());
     } catch (_) {
       return '';
     }

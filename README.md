@@ -66,6 +66,30 @@ The app consumes Zenno backend APIs and uses Firebase for authentication/messagi
 - `assets/` - app assets/icons
 - `android/` - Android platform configuration
 
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph flutter["Flutter app"]
+    Router["app router\nGoRouter"]
+    Features["features/*\ndashboard chat profile …"]
+    Riverpod["Riverpod\nproviders + DI"]
+    Dio["Dio\nHTTP"]
+    Socket["Socket.IO\nchat realtime"]
+  end
+
+  Firebase["Firebase\nAuth + FCM"]
+  Backend["Zenno Backend\n/api/v1"]
+
+  Router --> Features
+  Features --> Riverpod
+  Features --> Dio
+  Features --> Socket
+  Features --> Firebase
+  Dio --> Backend
+  Socket --> Backend
+```
+
 ## Prerequisites
 
 - Flutter SDK (matching Dart `^3.11.5`)
