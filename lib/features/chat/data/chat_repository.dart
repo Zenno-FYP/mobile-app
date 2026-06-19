@@ -28,6 +28,10 @@ class ChatRepository {
     await _client.post('/chat/conversations/$conversationId/read');
   }
 
+  Future<void> deleteConversation(String conversationId) async {
+    await _client.delete('/chat/conversations/$conversationId');
+  }
+
   /// Submits a moderation report for this conversation (same contract as the website).
   Future<void> reportConversation(String conversationId, {String? reason}) async {
     final t = reason?.trim();

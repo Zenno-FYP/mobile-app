@@ -81,7 +81,10 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
               itemCount: list.length,
               itemBuilder: (context, i) {
                 final conv = list[i];
-                return _ConversationTile(conv: conv);
+                return _ConversationTile(
+                  conv: conv,
+                  onDelete: () => _confirmDeleteConversation(conv),
+                );
               },
             ),
           );
@@ -89,11 +92,50 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       ),
     );
   }
+
+  Future<void> _confirmDeleteConversation(Conversation conv) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete chat?'),
+        content: Text(
+          'This removes the conversation with ${conv.otherUser.name} from your inbox only. The other person will still keep their copy.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete chat'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      await ChatRepository(ref.read(apiClientProvider)).deleteConversation(conv.id);
+      ref.invalidate(_conversationsProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chat deleted from your inbox')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete chat: $e')),
+      );
+    }
+  }
 }
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.conv});
+  const _ConversationTile({required this.conv, required this.onDelete});
   final Conversation conv;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +147,7 @@ class _ConversationTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         borderRadius: 16,
         onTap: () => context.push('/chats/${conv.id}', extra: conv.otherUser),
+        onLongPress: onDelete,
         child: Row(
           children: [
             AppAvatar(imageUrl: conv.otherUser.profilePhoto, name: conv.otherUser.name, size: 48),
