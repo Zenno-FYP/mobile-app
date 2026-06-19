@@ -21,19 +21,24 @@ import 'widgets/developer_trends_chart.dart';
 // Family provider — keyed by period string so toggling triggers a fresh fetch.
 final _metricsProvider =
     FutureProvider.family<PerformanceMetricsResponse, String>((ref, period) {
-  ref.watch(userSessionProvider);
-  return ref.watch(_dashboardRepoProvider).getPerformanceMetrics(period: period);
-});
+      ref.watch(userSessionProvider);
+      return ref
+          .watch(_dashboardRepoProvider)
+          .getPerformanceMetrics(period: period);
+    });
 
-final _dashboardRepoProvider =
-    Provider((ref) => DashboardRepository(ref.watch(apiClientProvider)));
+final _dashboardRepoProvider = Provider(
+  (ref) => DashboardRepository(ref.watch(apiClientProvider)),
+);
 
 final _toolUsageProvider = FutureProvider<ToolUsageResponse>((ref) {
   ref.watch(userSessionProvider);
   return ref.watch(_dashboardRepoProvider).getToolUsage();
 });
 
-final _allTimeAppsProvider = FutureProvider<List<ProfileGlobalRow>>((ref) async {
+final _allTimeAppsProvider = FutureProvider<List<ProfileGlobalRow>>((
+  ref,
+) async {
   ref.watch(userSessionProvider);
   final page = await ref.watch(_dashboardRepoProvider).getProfilePage();
   return page.topApps;
@@ -44,6 +49,20 @@ final _insightsProvider = FutureProvider<ProjectInsightsResponse>((ref) {
   return ref.watch(_dashboardRepoProvider).getProjectInsights();
 });
 
+typedef _TrendFilterEntry = ({String value, String label, Color color});
+const List<_TrendFilterEntry> _trendFilters = [
+  (value: 'all', label: 'All', color: AppColors.primaryStart),
+  (value: 'flow', label: 'Flow', color: AppColors.chartFlow),
+  (value: 'debugging', label: 'Debugging', color: AppColors.chartDebugging),
+  (value: 'research', label: 'Research', color: AppColors.chartResearch),
+  (
+    value: 'communication',
+    label: 'Communication',
+    color: AppColors.chartCommunication,
+  ),
+  (value: 'distracted', label: 'Distracted', color: AppColors.chartDistracted),
+];
+
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -53,10 +72,14 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _period = 'current_week';
+  String _trendFilter = 'all';
 
   void _togglePeriod(String p) {
     if (_period == p) return;
-    setState(() => _period = p);
+    setState(() {
+      _period = p;
+      _trendFilter = 'all';
+    });
   }
 
   @override
@@ -74,8 +97,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         actions: [
           const NotificationBellAction(),
           IconButton(
-            icon: Icon(Icons.settings_outlined,
-                color: isDark ? AppColors.darkText : AppColors.lightText),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: isDark ? AppColors.darkText : AppColors.lightText,
+            ),
             onPressed: () => showSettingsSheet(context),
           ),
         ],
@@ -104,7 +129,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.darkText : AppColors.lightText,
+                            color: isDark
+                                ? AppColors.darkText
+                                : AppColors.lightText,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -140,8 +167,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               data: (data) => _buildMetrics(context, data, isDark),
               loading: () => const _MetricsShimmer(),
               error: (e, _) => ErrorState(
-                  message: e.toString(),
-                  onRetry: () => ref.invalidate(_metricsProvider(_period))),
+                message: e.toString(),
+                onRetry: () => ref.invalidate(_metricsProvider(_period)),
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -177,8 +205,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
+                      height: 32,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: _trendFilters.map((filter) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: _TrendFilterChip(
+                              label: filter.label,
+                              color: filter.color,
+                              selected: _trendFilter == filter.value,
+                              isDark: isDark,
+                              onTap: () =>
+                                  setState(() => _trendFilter = filter.value),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
                       height: 200,
-                      child: DeveloperTrendsChart(data: data.usageTrendGraph),
+                      child: DeveloperTrendsChart(
+                        data: data.usageTrendGraph,
+                        filter: _trendFilter,
+                      ),
                     ),
                   ],
                 ),
@@ -204,10 +255,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     SectionHeader(
                       title: 'Strongest Skills',
                       icon: Icons.emoji_events,
-                      trailing: Icon(Icons.chevron_right,
-                          color: isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -215,10 +268,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       runSpacing: 8,
                       children: data.strongestSkills
                           .take(5)
-                          .map((s) => TagBadge(
+                          .map(
+                            (s) => TagBadge(
                               label:
                                   '${s.name} ${s.percent.toStringAsFixed(0)}%',
-                              isGradient: true))
+                              isGradient: true,
+                            ),
+                          )
                           .toList(),
                     ),
                   ],
@@ -240,48 +296,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     SectionHeader(
                       title: 'Recent Projects',
                       icon: Icons.folder_open,
-                      trailing: Icon(Icons.chevron_right,
-                          color: isDark
-                              ? AppColors.darkSecondaryText
-                              : AppColors.lightSecondaryText),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: isDark
+                            ? AppColors.darkSecondaryText
+                            : AppColors.lightSecondaryText,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    ...data.currentProjects.take(4).map((p) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: GestureDetector(
-                            onTap: () => context
-                                .push('/projects/${Uri.encodeComponent(p.name)}'),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    gradient: AppColors.primaryGradient,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    p.displayName ?? p.name,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isDark
-                                          ? AppColors.darkText
-                                          : AppColors.lightText,
+                    ...data.currentProjects
+                        .take(4)
+                        .map(
+                          (p) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: GestureDetector(
+                              onTap: () => context.push(
+                                '/projects/${Uri.encodeComponent(p.name)}',
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.primaryGradient,
+                                      shape: BoxShape.circle,
                                     ),
                                   ),
-                                ),
-                                Icon(Icons.chevron_right,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      p.displayName ?? p.name,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark
+                                            ? AppColors.darkText
+                                            : AppColors.lightText,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
                                     size: 18,
                                     color: isDark
                                         ? AppColors.darkSecondaryText
-                                        : AppColors.lightSecondaryText),
-                              ],
+                                        : AppColors.lightSecondaryText,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        )),
+                        ),
                   ],
                 ),
               ),
@@ -294,7 +359,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildMetrics(BuildContext context, PerformanceMetricsResponse data, bool isDark) {
+  Widget _buildMetrics(
+    BuildContext context,
+    PerformanceMetricsResponse data,
+    bool isDark,
+  ) {
     final s = data.performanceSummary;
     return GlassCard(
       onTap: () => context.push('/analytics/metrics'),
@@ -304,10 +373,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           SectionHeader(
             title: 'Performance Metrics',
             icon: Icons.speed,
-            trailing: Icon(Icons.chevron_right,
-                color: isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: isDark
+                  ? AppColors.darkSecondaryText
+                  : AppColors.lightSecondaryText,
+            ),
           ),
           const SizedBox(height: 12),
           GridView.count(
@@ -324,7 +395,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 value: s.avgTypingIntensity.value.toStringAsFixed(1),
                 changePercent: s.avgTypingIntensity.changePercent,
                 gradient: const LinearGradient(
-                    colors: [AppColors.primaryStart, AppColors.primaryEnd]),
+                  colors: [AppColors.primaryStart, AppColors.primaryEnd],
+                ),
               ),
               MetricTile(
                 icon: Icons.access_time,
@@ -332,7 +404,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 value: s.dailyActiveAverage.value.toStringAsFixed(1),
                 changePercent: s.dailyActiveAverage.changePercent,
                 gradient: const LinearGradient(
-                    colors: [AppColors.teal, AppColors.tealDark]),
+                  colors: [AppColors.teal, AppColors.tealDark],
+                ),
               ),
               MetricTile(
                 icon: Icons.mouse,
@@ -340,7 +413,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 value: s.avgMouseClickRate.value.toStringAsFixed(1),
                 changePercent: s.avgMouseClickRate.changePercent,
                 gradient: const LinearGradient(
-                    colors: [AppColors.yellow, AppColors.yellowDark]),
+                  colors: [AppColors.yellow, AppColors.yellowDark],
+                ),
               ),
               MetricTile(
                 icon: Icons.backspace_outlined,
@@ -348,7 +422,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 value: '${s.avgCorrections.value.toStringAsFixed(1)}%',
                 changePercent: s.avgCorrections.changePercent,
                 gradient: const LinearGradient(
-                    colors: [AppColors.pink, AppColors.pinkLight]),
+                  colors: [AppColors.pink, AppColors.pinkLight],
+                ),
               ),
             ],
           ),
@@ -363,8 +438,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     AsyncValue<ToolUsageResponse> toolUsageAsync,
     bool isDark,
   ) {
-    final secondaryColor =
-        isDark ? AppColors.darkSecondaryText : AppColors.lightSecondaryText;
+    final secondaryColor = isDark
+        ? AppColors.darkSecondaryText
+        : AppColors.lightSecondaryText;
     final chevron = Icon(Icons.chevron_right, color: secondaryColor);
 
     return GlassCard(
@@ -393,38 +469,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     style: TextStyle(fontSize: 11, color: secondaryColor),
                   ),
                   const SizedBox(height: 8),
-                  ...apps.take(5).map((app) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(app.name,
+                  ...apps
+                      .take(5)
+                      .map(
+                        (app) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  app.name,
                                   style: const TextStyle(fontSize: 14),
-                                  overflow: TextOverflow.ellipsis),
-                            ),
-                            Text(
-                              formatHours(app.durationHours),
-                              style: TextStyle(fontSize: 13, color: secondaryColor),
-                            ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 60,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(3),
-                                child: LinearProgressIndicator(
-                                  value: app.percent / 100,
-                                  minHeight: 6,
-                                  backgroundColor: isDark
-                                      ? const Color(0x1AFFFFFF)
-                                      : const Color(0xFFE5E7EB),
-                                  valueColor: const AlwaysStoppedAnimation(
-                                      AppColors.primaryStart),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                formatHours(app.durationHours),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 60,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(3),
+                                  child: LinearProgressIndicator(
+                                    value: app.percent / 100,
+                                    minHeight: 6,
+                                    backgroundColor: isDark
+                                        ? const Color(0x1AFFFFFF)
+                                        : const Color(0xFFE5E7EB),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                      AppColors.primaryStart,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                 ],
               );
             },
@@ -448,8 +534,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     runSpacing: 6,
                     children: langs
                         .take(5)
-                        .map((l) => TagBadge(
-                            label: '${l.name} ${l.percent.toStringAsFixed(0)}%'))
+                        .map(
+                          (l) => TagBadge(
+                            label: '${l.name} ${l.percent.toStringAsFixed(0)}%',
+                          ),
+                        )
                         .toList(),
                   ),
                 ],
@@ -457,6 +546,55 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrendFilterChip extends StatelessWidget {
+  const _TrendFilterChip({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          border: Border.all(
+            color: selected
+                ? color.withValues(alpha: 0.7)
+                : (isDark ? const Color(0x33FFFFFF) : const Color(0x33000000)),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected
+                ? color
+                : (isDark
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText),
+          ),
+        ),
       ),
     );
   }
@@ -491,9 +629,7 @@ class _WeekChip extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? AppColors.primaryStart.withValues(alpha: 0.6)
-                : (isDark
-                    ? const Color(0x33FFFFFF)
-                    : const Color(0x33000000)),
+                : (isDark ? const Color(0x33FFFFFF) : const Color(0x33000000)),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -505,8 +641,8 @@ class _WeekChip extends StatelessWidget {
             color: selected
                 ? AppColors.primaryStart
                 : (isDark
-                    ? AppColors.darkSecondaryText
-                    : AppColors.lightSecondaryText),
+                      ? AppColors.darkSecondaryText
+                      : AppColors.lightSecondaryText),
           ),
         ),
       ),
